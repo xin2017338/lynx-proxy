@@ -1,4 +1,4 @@
-use crate::storage::{DataStore, read_json_or_default, write_json_atomic};
+use crate::storage::DataStore;
 use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -38,12 +38,8 @@ impl CaptureRulesDao {
         Self { store }
     }
 
-    fn path(&self) -> std::path::PathBuf {
-        self.store.setting_path("capture_rules")
-    }
-
     pub async fn get_rules(&self) -> Result<CaptureRules> {
-        read_json_or_default(&self.path()).await
+        self.store.get_capture_rules().await
     }
 
     pub async fn list(&self, kind: CaptureRuleKind) -> Result<Vec<CaptureRule>> {
@@ -93,7 +89,7 @@ impl CaptureRulesDao {
                 .then_with(|| b.id.cmp(&a.id))
         });
 
-        write_json_atomic(&self.path(), &rules).await?;
+        self.store.set_capture_rules(rules).await?;
         Ok(rule)
     }
 
@@ -108,7 +104,7 @@ impl CaptureRulesDao {
         if list.len() == before {
             return Err(anyhow!("Capture rule {rule_id} not found"));
         }
-        write_json_atomic(&self.path(), &rules).await?;
+        self.store.set_capture_rules(rules).await?;
         Ok(())
     }
 
@@ -130,7 +126,7 @@ impl CaptureRulesDao {
         item.enabled = enabled;
         item.updated_at = now;
         let out = item.clone();
-        write_json_atomic(&self.path(), &rules).await?;
+        self.store.set_capture_rules(rules).await?;
         Ok(out)
     }
 }

@@ -1,4 +1,4 @@
-use crate::storage::{DataStore, read_json_or_default, write_json_atomic};
+use crate::storage::DataStore;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -37,16 +37,12 @@ impl ClientProxyDao {
         Self { store }
     }
 
-    fn path(&self) -> std::path::PathBuf {
-        self.store.setting_path("client_proxy")
-    }
-
     pub async fn get_client_proxy_config(&self) -> Result<ClientProxyConfig> {
-        read_json_or_default(&self.path()).await
+        self.store.get_client_proxy().await
     }
 
     pub async fn update_client_proxy_config(&self, config: ClientProxyConfig) -> Result<()> {
-        write_json_atomic(&self.path(), &config).await
+        self.store.set_client_proxy(config).await
     }
 }
 

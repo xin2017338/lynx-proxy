@@ -1,6 +1,7 @@
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::{Result, anyhow};
 use derive_builder::Builder;
@@ -14,15 +15,15 @@ use hyper_util::service::TowerToHyperService;
 use include_dir::Dir;
 use local_ip_address::list_afinet_netifas;
 use lynx_storage::DataStore;
-use lynx_storage::dao::client_proxy_dao::ClientProxyDao;
 use rcgen::Certificate;
 use tokio::net::TcpListener;
+use tokio::sync::Semaphore;
 use tokio_rustls::TlsAcceptor;
 use tower::util::Oneshot;
 use tower::{ServiceBuilder, service_fn};
 use tracing::{Instrument, debug, instrument, trace, trace_span, warn};
 
-use crate::client::request_client::RequestClientBuilder;
+use crate::client::request_client::SharedRequestClient;
 use crate::common::{HyperReq, is_https_tcp_stream};
 use crate::gateway_service::gateway_service_fn;
 use crate::layers::error_handle_layer::ErrorHandlerLayer;
@@ -41,6 +42,9 @@ pub use listen_info::ProxyListenInfo;
 
 use server_ca_manage::ServerCaManager;
 use server_config::ProxyServerConfig;
+
+/// Cap concurrent accepted connections to avoid exhausting file descriptors.
+const MAX_CONCURRENT_CONNECTIONS: usize = 512;
 
 #[derive(Debug, Clone)]
 pub struct StaticDir(pub Dir<'static>);
@@ -229,10 +233,14 @@ impl ProxyServer {
         tcp_listener.into_iter().collect()
     }
 
-    #[instrument(skip(self))]
-    async fn bind_hyper(&self, listener: TcpListener) -> Result<()> {
+    #[instrument(skip(self, shared_request_client, connection_limiter))]
+    async fn bind_hyper(
+        &self,
+        listener: TcpListener,
+        shared_request_client: Arc<SharedRequestClient>,
+        connection_limiter: Arc<Semaphore>,
+    ) -> Result<()> {
         let access_addr_list: Arc<Vec<SocketAddr>> = Arc::new(self.access_addr_list.clone());
-        let client_custom_certs = self.custom_certs.clone();
         let server_ca_manager = self.server_ca_manager.clone();
         let server_config = self.config.clone();
         let message_event_store = self.message_event_cache.clone();
@@ -254,45 +262,33 @@ impl ProxyServer {
 
         tokio::spawn(async move {
             loop {
-                let (tcp_stream, client_addr) = listener.accept().await.expect("accept failed");
+                let permit = match connection_limiter.clone().acquire_owned().await {
+                    Ok(permit) => permit,
+                    Err(_) => {
+                        warn!("connection limiter closed; stopping accept loop");
+                        break;
+                    }
+                };
+                let (tcp_stream, client_addr) = match listener.accept().await {
+                    Ok(conn) => conn,
+                    Err(err) => {
+                        // Under FD pressure, keep the accept loop alive instead of panicking.
+                        warn!("accept failed: {err}");
+                        drop(permit);
+                        tokio::time::sleep(Duration::from_millis(50)).await;
+                        continue;
+                    }
+                };
+
                 let tls_acceptor = tls_acceptor.clone();
-
-                // ??????????
-                let client_proxy_dao = ClientProxyDao::new(data_store.clone());
-                let client_proxy_config = client_proxy_dao
-                    .get_client_proxy_config()
-                    .await
-                    .unwrap_or_default();
-
-                tracing::info!("Client proxy configuration loaded:");
-                tracing::info!(
-                    "  Proxy requests: type={}, url={:?}",
-                    client_proxy_config.proxy_requests.proxy_type,
-                    client_proxy_config.proxy_requests.url
-                );
-                tracing::info!(
-                    "  API debug: type={}, url={:?}",
-                    client_proxy_config.api_debug.proxy_type,
-                    client_proxy_config.api_debug.url
-                );
-
-                let proxy_requests_type = crate::client::ProxyType::from_proxy_config(
-                    &client_proxy_config.proxy_requests.proxy_type,
-                    client_proxy_config.proxy_requests.url.as_ref(),
-                );
-                let api_debug_proxy_type = crate::client::ProxyType::from_proxy_config(
-                    &client_proxy_config.api_debug.proxy_type,
-                    client_proxy_config.api_debug.url.as_ref(),
-                );
-
-                let request_client = Arc::new(
-                    RequestClientBuilder::default()
-                        .custom_certs(client_custom_certs.clone())
-                        .proxy_requests_config(proxy_requests_type)
-                        .api_debug_proxy_config(api_debug_proxy_type)
-                        .build()
-                        .expect("build request client error"),
-                );
+                let request_client = match shared_request_client.current().await {
+                    Ok(client) => client,
+                    Err(err) => {
+                        tracing::error!("failed to get shared request client: {:#}", err);
+                        drop(permit);
+                        continue;
+                    }
+                };
 
                 let server_ca_manager = server_ca_manager.clone();
                 let server_config = server_config.clone();
@@ -304,6 +300,7 @@ impl ProxyServer {
                 let auth_config = auth_config.clone();
                 let listen_info = listen_info.clone();
                 tokio::task::spawn(async move {
+                    let _permit = permit;
                     let svc = service_fn(gateway_service_fn);
                     let svc = ServiceBuilder::new()
                         .layer(RequestExtensionLayer::new(data_store.clone()))
@@ -375,8 +372,19 @@ impl ProxyServer {
             .filter_map(|listener| listener.local_addr().ok())
             .collect();
         self.access_addr_list = bind_addrs;
+
+        let shared_request_client = Arc::new(
+            SharedRequestClient::new(self.custom_certs.clone(), self.data_store.clone()).await?,
+        );
+        let connection_limiter = Arc::new(Semaphore::new(MAX_CONCURRENT_CONNECTIONS));
+
         for tcp_listener in tcp_listeners {
-            self.bind_hyper(tcp_listener).await?;
+            self.bind_hyper(
+                tcp_listener,
+                shared_request_client.clone(),
+                connection_limiter.clone(),
+            )
+            .await?;
         }
         Ok(())
     }
@@ -438,9 +446,20 @@ mod tests {
         let server = build_test_proxy_server().await?;
 
         let tcp_listeners = server.bind_tcp_listener().await?;
+        let shared_request_client = Arc::new(
+            SharedRequestClient::new(server.custom_certs.clone(), server.data_store.clone())
+                .await?,
+        );
+        let connection_limiter = Arc::new(Semaphore::new(MAX_CONCURRENT_CONNECTIONS));
 
         for tcp_listener in tcp_listeners {
-            server.bind_hyper(tcp_listener).await?;
+            server
+                .bind_hyper(
+                    tcp_listener,
+                    shared_request_client.clone(),
+                    connection_limiter.clone(),
+                )
+                .await?;
         }
         Ok(())
     }

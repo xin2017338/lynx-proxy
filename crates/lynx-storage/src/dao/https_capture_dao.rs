@@ -1,4 +1,4 @@
-use crate::storage::{DataStore, read_json_or_default, write_json_atomic};
+use crate::storage::DataStore;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -50,15 +50,11 @@ impl HttpsCaptureDao {
         Self { store }
     }
 
-    fn path(&self) -> std::path::PathBuf {
-        self.store.setting_path("https_capture")
-    }
-
     pub async fn get_capture_filter(&self) -> Result<CaptureFilter> {
-        read_json_or_default(&self.path()).await
+        self.store.get_https_capture().await
     }
 
     pub async fn update_capture_filter(&self, filter: CaptureFilter) -> Result<()> {
-        write_json_atomic(&self.path(), &filter).await
+        self.store.set_https_capture(filter).await
     }
 }

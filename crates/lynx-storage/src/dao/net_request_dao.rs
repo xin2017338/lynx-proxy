@@ -1,4 +1,4 @@
-use crate::storage::{DataStore, read_json_or_default, write_json_atomic};
+use crate::storage::DataStore;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -26,16 +26,12 @@ impl CaptureSwitchDao {
         Self { store }
     }
 
-    fn path(&self) -> std::path::PathBuf {
-        self.store.setting_path("capture_switch")
-    }
-
     pub async fn get_capture_switch(&self) -> Result<CaptureSwitch> {
-        read_json_or_default(&self.path()).await
+        self.store.get_capture_switch().await
     }
 
     pub async fn update_capture_switch(&self, switch: CaptureSwitch) -> Result<()> {
-        write_json_atomic(&self.path(), &switch).await
+        self.store.set_capture_switch(switch).await
     }
 }
 

@@ -3,6 +3,7 @@ mod json_file;
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use anyhow::{Result, anyhow};
 use tokio::fs;
@@ -24,21 +25,14 @@ pub struct RulesCacheEntry {
     pub compiled: Vec<CompiledRule>,
 }
 
-#[derive(Clone, PartialEq, Eq)]
-struct RulesDirFingerprint {
-    file_count: usize,
-    max_mtime: std::time::SystemTime,
-}
-
-#[derive(Clone)]
-struct RulesCacheState {
-    entry: RulesCacheEntry,
-    fingerprint: RulesDirFingerprint,
-}
-
 pub struct DataStore {
     root: PathBuf,
-    rules_cache: RwLock<Option<RulesCacheState>>,
+    rules_cache: RwLock<Option<RulesCacheEntry>>,
+    https_capture_cache: RwLock<Option<CaptureFilter>>,
+    client_proxy_cache: RwLock<Option<ClientProxyConfig>>,
+    client_proxy_generation: AtomicU64,
+    capture_switch_cache: RwLock<Option<CaptureSwitch>>,
+    capture_rules_cache: RwLock<Option<CaptureRules>>,
 }
 
 impl DataStore {
@@ -47,6 +41,11 @@ impl DataStore {
         let store = Arc::new(Self {
             root: root.clone(),
             rules_cache: RwLock::new(None),
+            https_capture_cache: RwLock::new(None),
+            client_proxy_cache: RwLock::new(None),
+            client_proxy_generation: AtomicU64::new(0),
+            capture_switch_cache: RwLock::new(None),
+            capture_rules_cache: RwLock::new(None),
         });
         store.ensure_layout().await?;
         Ok(store)
@@ -105,51 +104,18 @@ impl DataStore {
         *cache = None;
     }
 
-    async fn rules_dir_fingerprint(&self) -> Result<RulesDirFingerprint> {
-        use std::time::UNIX_EPOCH;
-
-        let mut file_count = 0usize;
-        let mut max_mtime = UNIX_EPOCH;
-        let mut entries = fs::read_dir(self.rules_dir()).await?;
-        while let Some(entry) = entries.next_entry().await? {
-            let name = entry.file_name().to_string_lossy().into_owned();
-            if !name.ends_with(".json") || name == "templates.json" {
-                continue;
-            }
-            file_count += 1;
-            let meta = entry.metadata().await?;
-            if let Ok(mtime) = meta.modified() {
-                max_mtime = max_mtime.max(mtime);
-            }
-        }
-        Ok(RulesDirFingerprint {
-            file_count,
-            max_mtime,
-        })
-    }
-
-    async fn is_rules_cache_stale(&self, fingerprint: &RulesDirFingerprint) -> Result<bool> {
-        Ok(self.rules_dir_fingerprint().await? != *fingerprint)
-    }
-
     pub async fn get_rules_cache(&self) -> Result<Vec<RequestRule>> {
         Ok(self.get_rules_cache_entry().await?.rules)
     }
 
     pub async fn get_rules_cache_entry(&self) -> Result<RulesCacheEntry> {
-        if let Some(state) = self.rules_cache.read().await.clone()
-            && !self.is_rules_cache_stale(&state.fingerprint).await?
-        {
-            return Ok(state.entry);
+        if let Some(entry) = self.rules_cache.read().await.clone() {
+            return Ok(entry);
         }
 
-        let fingerprint = self.rules_dir_fingerprint().await?;
         let entry = self.load_rules_cache_entry().await?;
         let mut cache = self.rules_cache.write().await;
-        *cache = Some(RulesCacheState {
-            entry: entry.clone(),
-            fingerprint,
-        });
+        *cache = Some(entry.clone());
         Ok(entry)
     }
 
@@ -194,6 +160,75 @@ impl DataStore {
 
     pub async fn next_rule_id(&self) -> Result<i32> {
         id::next_id_in_dir(&self.rules_dir()).await
+    }
+
+    pub fn client_proxy_generation(&self) -> u64 {
+        self.client_proxy_generation.load(Ordering::Acquire)
+    }
+
+    pub async fn get_https_capture(&self) -> Result<CaptureFilter> {
+        if let Some(cached) = self.https_capture_cache.read().await.clone() {
+            return Ok(cached);
+        }
+        let value: CaptureFilter =
+            read_json_or_default(&self.setting_path("https_capture")).await?;
+        *self.https_capture_cache.write().await = Some(value.clone());
+        Ok(value)
+    }
+
+    pub async fn set_https_capture(&self, filter: CaptureFilter) -> Result<()> {
+        write_json_atomic(&self.setting_path("https_capture"), &filter).await?;
+        *self.https_capture_cache.write().await = Some(filter);
+        Ok(())
+    }
+
+    pub async fn get_client_proxy(&self) -> Result<ClientProxyConfig> {
+        if let Some(cached) = self.client_proxy_cache.read().await.clone() {
+            return Ok(cached);
+        }
+        let value: ClientProxyConfig =
+            read_json_or_default(&self.setting_path("client_proxy")).await?;
+        *self.client_proxy_cache.write().await = Some(value.clone());
+        Ok(value)
+    }
+
+    pub async fn set_client_proxy(&self, config: ClientProxyConfig) -> Result<()> {
+        write_json_atomic(&self.setting_path("client_proxy"), &config).await?;
+        *self.client_proxy_cache.write().await = Some(config);
+        self.client_proxy_generation.fetch_add(1, Ordering::Release);
+        Ok(())
+    }
+
+    pub async fn get_capture_switch(&self) -> Result<CaptureSwitch> {
+        if let Some(cached) = self.capture_switch_cache.read().await.clone() {
+            return Ok(cached);
+        }
+        let value: CaptureSwitch =
+            read_json_or_default(&self.setting_path("capture_switch")).await?;
+        *self.capture_switch_cache.write().await = Some(value.clone());
+        Ok(value)
+    }
+
+    pub async fn set_capture_switch(&self, switch: CaptureSwitch) -> Result<()> {
+        write_json_atomic(&self.setting_path("capture_switch"), &switch).await?;
+        *self.capture_switch_cache.write().await = Some(switch);
+        Ok(())
+    }
+
+    pub async fn get_capture_rules(&self) -> Result<CaptureRules> {
+        if let Some(cached) = self.capture_rules_cache.read().await.clone() {
+            return Ok(cached);
+        }
+        let value: CaptureRules =
+            read_json_or_default(&self.setting_path("capture_rules")).await?;
+        *self.capture_rules_cache.write().await = Some(value.clone());
+        Ok(value)
+    }
+
+    pub async fn set_capture_rules(&self, rules: CaptureRules) -> Result<()> {
+        write_json_atomic(&self.setting_path("capture_rules"), &rules).await?;
+        *self.capture_rules_cache.write().await = Some(rules);
+        Ok(())
     }
 
     async fn ensure_layout(&self) -> Result<()> {
@@ -258,7 +293,7 @@ mod tests {
     use tempfile::tempdir;
 
     #[tokio::test]
-    async fn reloads_rules_cache_when_rule_files_change_externally() -> Result<()> {
+    async fn keeps_rules_cache_until_invalidated() -> Result<()> {
         let dir = tempdir()?;
         let store = DataStore::new(dir.path()).await?;
 
@@ -286,7 +321,76 @@ mod tests {
         write_json_atomic(&rule_path, &updated).await?;
 
         let second = store.get_rules_cache_entry().await?;
-        assert_eq!(second.rules[0].name, "v2");
+        assert_eq!(second.rules[0].name, "v1");
+
+        store.invalidate_rules_cache().await;
+        let third = store.get_rules_cache_entry().await?;
+        assert_eq!(third.rules[0].name, "v2");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn settings_cache_returns_updates_immediately() -> Result<()> {
+        let dir = tempdir()?;
+        let store = DataStore::new(dir.path()).await?;
+
+        let mut filter = store.get_https_capture().await?;
+        filter.enabled = false;
+        store.set_https_capture(filter.clone()).await?;
+        assert!(!store.get_https_capture().await?.enabled);
+
+        let mut switch = store.get_capture_switch().await?;
+        switch.recording_status =
+            crate::dao::net_request_dao::RecordingStatus::PauseRecording;
+        store.set_capture_switch(switch).await?;
+        assert!(matches!(
+            store.get_capture_switch().await?.recording_status,
+            crate::dao::net_request_dao::RecordingStatus::PauseRecording
+        ));
+
+        let gen_before = store.client_proxy_generation();
+        let mut proxy = store.get_client_proxy().await?;
+        proxy.proxy_requests.proxy_type = "system".to_string();
+        store.set_client_proxy(proxy).await?;
+        assert_eq!(
+            store.get_client_proxy().await?.proxy_requests.proxy_type,
+            "system"
+        );
+        assert!(store.client_proxy_generation() > gen_before);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn hot_path_settings_survive_heavy_concurrent_reads() -> Result<()> {
+        let dir = tempdir()?;
+        let store = DataStore::new(dir.path()).await?;
+
+        // Warm caches once.
+        let _ = store.get_https_capture().await?;
+        let _ = store.get_capture_switch().await?;
+        let _ = store.get_capture_rules().await?;
+        let _ = store.get_client_proxy().await?;
+        let _ = store.get_rules_cache_entry().await?;
+
+        let mut tasks = Vec::new();
+        for _ in 0..256 {
+            let store = Arc::clone(&store);
+            tasks.push(tokio::spawn(async move {
+                for _ in 0..32 {
+                    store.get_https_capture().await?;
+                    store.get_capture_switch().await?;
+                    store.get_capture_rules().await?;
+                    store.get_client_proxy().await?;
+                    store.get_rules_cache_entry().await?;
+                }
+                Ok::<(), anyhow::Error>(())
+            }));
+        }
+
+        for task in tasks {
+            task.await??;
+        }
         Ok(())
     }
 }
