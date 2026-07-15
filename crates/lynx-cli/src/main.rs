@@ -10,28 +10,13 @@ use lynx_cli::{
 };
 use tokio::signal;
 
-/// Commands that start a long-running server — for these we check updates
-/// before starting so the prompt doesn't get buried.
-fn is_server_command(cmd: &Commands) -> bool {
-    matches!(cmd, Commands::Run { .. } | Commands::Start { .. })
-}
-
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
-    let is_server = is_server_command(&args.command);
 
-    // Check for new version (max 3 seconds)
-    let latest = version_check::check_for_updates().await;
-
-    if let Some(ref v) = latest {
-        if is_server {
-            // Server commands: print banner only (no stdin prompt)
-            version_check::print_update_banner(v);
-        } else {
-            // Other commands: interactively ask to update
-            version_check::prompt_and_update(v);
-        }
+    // Soft reminder only — no interactive update prompt
+    if let Some(ref v) = version_check::check_for_updates().await {
+        version_check::print_update_banner(v);
     }
 
     match args.command {

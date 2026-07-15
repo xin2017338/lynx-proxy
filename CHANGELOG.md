@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.8] - 2026-07-15
+
+### ♻️ Refactor
+
+- *(cli)* Soft-only update reminder: print new version banner with releases URL, no interactive `[y/N]` install prompt
+
 ## [0.8.7] - 2026-07-15
 
 ### 🐛 Bug Fixes

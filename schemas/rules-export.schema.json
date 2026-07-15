@@ -1,5 +1,5 @@
 {
-  "$id": "https://raw.githubusercontent.com/xin2017338/lynx-proxy/v0.8.7/schemas/rules-export.schema.json",
+  "$id": "https://raw.githubusercontent.com/xin2017338/lynx-proxy/v0.8.8/schemas/rules-export.schema.json",
   "$schema": "http://json-schema.org/draft-07/schema#",
   "definitions": {
     "CaptureRule": {
