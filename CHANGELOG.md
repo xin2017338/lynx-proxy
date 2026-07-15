@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.7] - 2026-07-15
+
+### 🐛 Bug Fixes
+
+- *(proxy)* Prevent EMFILE (`Too many open files`) under high concurrency by reusing `RequestClient`, caching hot-path settings, skipping rules directory fingerprints on cache hits, and capping concurrent accepts so localhost self-service stays available
+
+### 🧪 Testing
+
+- *(proxy)* Add EMFILE resilience coverage for shared client reuse and concurrent localhost health checks
+
 ## [0.8.6] - 2026-06-29
 
 ### 🚀 Features

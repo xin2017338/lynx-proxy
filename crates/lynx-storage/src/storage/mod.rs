@@ -219,8 +219,7 @@ impl DataStore {
         if let Some(cached) = self.capture_rules_cache.read().await.clone() {
             return Ok(cached);
         }
-        let value: CaptureRules =
-            read_json_or_default(&self.setting_path("capture_rules")).await?;
+        let value: CaptureRules = read_json_or_default(&self.setting_path("capture_rules")).await?;
         *self.capture_rules_cache.write().await = Some(value.clone());
         Ok(value)
     }
@@ -340,8 +339,7 @@ mod tests {
         assert!(!store.get_https_capture().await?.enabled);
 
         let mut switch = store.get_capture_switch().await?;
-        switch.recording_status =
-            crate::dao::net_request_dao::RecordingStatus::PauseRecording;
+        switch.recording_status = crate::dao::net_request_dao::RecordingStatus::PauseRecording;
         store.set_capture_switch(switch).await?;
         assert!(matches!(
             store.get_capture_switch().await?.recording_status,

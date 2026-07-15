@@ -122,8 +122,7 @@ impl SharedRequestClient {
             return Ok(Arc::clone(&state.1));
         }
 
-        let (generation, client) =
-            Self::build_client(&self.custom_certs, &self.data_store).await?;
+        let (generation, client) = Self::build_client(&self.custom_certs, &self.data_store).await?;
         *state = (generation, Arc::clone(&client));
         Ok(client)
     }
