@@ -2,21 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.8.8] - 2026-07-15
+## [0.8.9] - 2026-07-20
 
-### ♻️ Refactor
+### 🚀 Features
 
-- *(cli)* Soft-only update reminder: print new version banner with releases URL, no interactive `[y/N]` install prompt
+- Improve rules UX and hide CONNECT tunnels by default
+
+### 🐛 Bug Fixes
+
+- *(release)* Drop unsupported pre-tag-hook from release.toml
 
 ## [0.8.7] - 2026-07-15
 
 ### 🐛 Bug Fixes
 
-- *(proxy)* Prevent EMFILE (`Too many open files`) under high concurrency by reusing `RequestClient`, caching hot-path settings, skipping rules directory fingerprints on cache hits, and capping concurrent accepts so localhost self-service stays available
-
-### 🧪 Testing
-
-- *(proxy)* Add EMFILE resilience coverage for shared client reuse and concurrent localhost health checks
+- *(proxy)* Prevent EMFILE from exhausting FDs under high concurrency
 
 ## [0.8.6] - 2026-06-29
 
@@ -24,52 +24,35 @@ All notable changes to this project will be documented in this file.
 
 - *(daemon)* Support custom restart params and hide PID/uptime on stopped status
 
-## [0.8.5] - 2026-06-26
+## [0.8.0] - 2026-06-23
 
 ### 🐛 Bug Fixes
 
-- *(auth)* Allow static assets (JS/CSS/images) to load without authentication so the login page can render properly
-- *(cert)* Fix `cert uninstall` failing with "No matching lynxProxy certificate found" when root.pem was regenerated — now removes all lynxProxy certificates from the System Keychain regardless of fingerprint match
+- Update issue links from lynx-server to lynx-proxy
+- Update lynx-cli dependencies to 0.8.0
+- *(ci)* Use github token for release workflow
 
-### ⚙️ Miscellaneous Tasks
+### 💼 Other
 
-- *(release)* Add release skill to `.github/skills/release/` to standardize the release workflow
+- V0.8.0
 
-## [0.8.4] - 2026-06-26
-
-### 🐛 Bug Fixes
-
-- *(auth)* Allow static assets (JS/CSS/images) to load without authentication so the login page can render properly
-- *(cert)* Fix `cert uninstall` failing with "No matching lynxProxy certificate found" when root.pem was regenerated — now removes all lynxProxy certificates from the System Keychain regardless of fingerprint match
-
-## [0.8.3] - 2026-06-26
+## [0.7.4] - 2026-06-18
 
 ### 🚀 Features
 
-- *(cli)* Auto-check for new version on every command; interactive update prompt when newer release is available
-- *(cli)* Use `lynx-cli-update` (cargo-dist updater) when updating
+- *(settings)* Increase default max log size to 5000
 
-## [0.8.2] - 2026-06-25
+## [0.7.3] - 2026-06-17
 
-### 🐛 Bug Fixes
+### ⚡ Performance
 
-- *(daemon)* Fix `lynx start -u -p` failing with "invalid type: map, expected a sequence" by making `/api/base_info/address` a public endpoint
-- *(daemon)* Show detailed running instance info (PID, port, auth, data dir) when daemon is already running
+- *(core)* Reduce message cache memory usage and add regression tests
 
-## [0.8.1] - 2026-06-25
+## [0.7.2] - 2026-06-17
 
 ### 🐛 Bug Fixes
 
-- *(daemon)* Forward `-u`/`-p` auth credentials to the subprocess in daemon mode
-- *(storage)* Remove unused `ConnectType` enum and `connect_type` field from `GeneralSetting`
-- *(docs)* Remove stale `--connect-type` CLI option from README
-
-## [0.7.1] - 2026-06-17
-
-### 🐛 Bug Fixes
-
-- *(cli)* Install Lynx root CA into macOS System Keychain and fix cert status detection
-- *(docs)* Update README and Chinese README for System Keychain install flow
+- *(proxy)* Preserve Origin and Sec-WebSocket-Extensions in upstream handshake
 
 ## [0.7.0] - 2026-06-16
 
