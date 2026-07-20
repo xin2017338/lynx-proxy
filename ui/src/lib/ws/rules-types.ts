@@ -38,6 +38,7 @@ export interface RulesListResponse {
 export interface RuleProjectDto {
   id: string
   name: string
+  enabled?: boolean
 }
 
 export interface ProjectsFileDto {
@@ -61,6 +62,11 @@ export interface ProjectsDeletePayload {
 
 export interface ProjectsActiveSetPayload {
   projectId: string
+}
+
+export interface ProjectsEnabledPayload {
+  projectId: string
+  enabled: boolean
 }
 
 export interface RulesListPayload {

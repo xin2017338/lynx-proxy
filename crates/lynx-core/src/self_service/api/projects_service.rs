@@ -45,3 +45,16 @@ pub async fn delete_project(state: &RouteState, project_id: &str) -> Result<()> 
     }
     ProjectsDao::new(store).delete_project(project_id).await
 }
+
+pub async fn set_project_enabled(
+    state: &RouteState,
+    project_id: &str,
+    enabled: bool,
+) -> Result<RuleProject> {
+    let store = state.store.clone();
+    let project = ProjectsDao::new(store.clone())
+        .toggle_project_enabled(project_id, enabled)
+        .await?;
+    store.invalidate_rules_cache().await;
+    Ok(project)
+}

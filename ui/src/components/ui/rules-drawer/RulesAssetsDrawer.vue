@@ -288,6 +288,7 @@ function onRuleDraftUpdate(next: RuleDraft) {
                   @create="rulesStore.createProjectWithName"
                   @rename="rulesStore.renameProject"
                   @move-rules="rulesStore.moveRulesToProject"
+                  @toggle-enabled="rulesStore.toggleProjectEnabled"
                 />
               </template>
 
@@ -297,6 +298,7 @@ function onRuleDraftUpdate(next: RuleDraft) {
                     :rules="props.rules"
                     :selected-rule-id="props.selectedRuleId"
                     :reordering="storeReordering"
+                    :show-all-projects="storeActiveProjectId === 'default'"
                     class="min-h-0 flex-1"
                     @create="onCreateRule"
                     @edit="onEditRule"

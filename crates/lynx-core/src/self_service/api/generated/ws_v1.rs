@@ -4,12 +4,12 @@ pub const WS_VERSION: &str = "v1";
 pub const WS_CHANNEL_ADDRESS: &str = "/api/net_request/ws/message-events";
 
 pub mod frame_kind {
-    pub const REQUEST: &str = "request";
-    pub const RESPONSE: &str = "response";
-    pub const EVENT: &str = "event";
-    pub const ERROR: &str = "error";
-    pub const PING: &str = "ping";
-    pub const PONG: &str = "pong";
+pub const REQUEST: &str = "request";
+pub const RESPONSE: &str = "response";
+pub const EVENT: &str = "event";
+pub const ERROR: &str = "error";
+pub const PING: &str = "ping";
+pub const PONG: &str = "pong";
 }
 
 pub mod op {
@@ -36,6 +36,7 @@ pub mod op {
     pub const PROJECTS_CREATE: &str = "projects.create";
     pub const PROJECTS_RENAME: &str = "projects.rename";
     pub const PROJECTS_DELETE: &str = "projects.delete";
+    pub const PROJECTS_ENABLED_SET: &str = "projects.enabled.set";
     pub const CAPTURE_RULES_FOCUS_LIST_GET: &str = "capture.rules.focus.list.get";
     pub const CAPTURE_RULES_IGNORE_LIST_GET: &str = "capture.rules.ignore.list.get";
     pub const CAPTURE_RULES_FOCUS_UPSERT: &str = "capture.rules.focus.upsert";
@@ -67,66 +68,67 @@ pub mod op {
     pub const SYSTEM_ERROR: &str = "system.error";
 
     pub fn is_request_op(op: &str) -> bool {
-        matches!(
-            op,
-            "system.ping"
-                | "capture.status.get"
-                | "capture.control.set"
-                | "request.detail.get"
-                | "request.stream.subscribe"
-                | "request.stream.unsubscribe"
-                | "compose.request.send"
-                | "settings.general.get"
-                | "settings.general.set"
-                | "settings.captureFilter.get"
-                | "settings.captureFilter.set"
-                | "settings.certificate.path.get"
-                | "rules.list.get"
-                | "rules.get"
-                | "rules.save.set"
-                | "rules.enabled.set"
-                | "rules.delete"
-                | "rules.templates.get"
-                | "projects.list.get"
-                | "projects.active.set"
-                | "projects.create"
-                | "projects.rename"
-                | "projects.delete"
-                | "capture.rules.focus.list.get"
-                | "capture.rules.ignore.list.get"
-                | "capture.rules.focus.upsert"
-                | "capture.rules.ignore.upsert"
-                | "capture.rules.focus.delete"
-                | "capture.rules.ignore.delete"
-                | "capture.rules.focus.enabled.set"
-                | "capture.rules.ignore.enabled.set"
-                | "device.adb.status.get"
-                | "device.adb.install"
-                | "device.adb.install.progress.get"
-                | "device.adb.devices.list"
-                | "device.adb.proxy.state.get"
-                | "device.adb.proxy.enable"
-                | "device.adb.proxy.disable"
-                | "network.trafficFilter.history.get"
-                | "network.trafficFilter.history.append"
-                | "network.trafficFilter.history.clear"
+      matches!(
+        op,
+            "system.ping" |
+            "capture.status.get" |
+            "capture.control.set" |
+            "request.detail.get" |
+            "request.stream.subscribe" |
+            "request.stream.unsubscribe" |
+            "compose.request.send" |
+            "settings.general.get" |
+            "settings.general.set" |
+            "settings.captureFilter.get" |
+            "settings.captureFilter.set" |
+            "settings.certificate.path.get" |
+            "rules.list.get" |
+            "rules.get" |
+            "rules.save.set" |
+            "rules.enabled.set" |
+            "rules.delete" |
+            "rules.templates.get" |
+            "projects.list.get" |
+            "projects.active.set" |
+            "projects.create" |
+            "projects.rename" |
+            "projects.delete" |
+            "projects.enabled.set" |
+            "capture.rules.focus.list.get" |
+            "capture.rules.ignore.list.get" |
+            "capture.rules.focus.upsert" |
+            "capture.rules.ignore.upsert" |
+            "capture.rules.focus.delete" |
+            "capture.rules.ignore.delete" |
+            "capture.rules.focus.enabled.set" |
+            "capture.rules.ignore.enabled.set" |
+            "device.adb.status.get" |
+            "device.adb.install" |
+            "device.adb.install.progress.get" |
+            "device.adb.devices.list" |
+            "device.adb.proxy.state.get" |
+            "device.adb.proxy.enable" |
+            "device.adb.proxy.disable" |
+            "network.trafficFilter.history.get" |
+            "network.trafficFilter.history.append" |
+            "network.trafficFilter.history.clear"
         )
     }
 
     pub fn is_event_op(op: &str) -> bool {
-        matches!(
-            op,
-            "capture.status.changed"
-                | "request.start"
-                | "request.body"
-                | "request.end"
-                | "response.start"
-                | "response.body"
-                | "response.end"
-                | "websocket.message"
-                | "websocket.error"
-                | "websocket.end"
-                | "system.error"
+      matches!(
+        op,
+            "capture.status.changed" |
+            "request.start" |
+            "request.body" |
+            "request.end" |
+            "response.start" |
+            "response.body" |
+            "response.end" |
+            "websocket.message" |
+            "websocket.error" |
+            "websocket.end" |
+            "system.error"
         )
     }
 }

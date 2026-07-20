@@ -84,3 +84,34 @@ async fn old_schema_rule_file_causes_load_error() -> Result<()> {
     );
     Ok(())
 }
+
+#[tokio::test]
+async fn skips_rules_in_disabled_project() -> Result<()> {
+    use lynx_storage::dao::projects_dao::ProjectsDao;
+
+    let dir = tempdir()?;
+    let store = DataStore::new(dir.path()).await?;
+    let projects = ProjectsDao::new(store.clone());
+    projects
+        .create_project("staging".to_string(), "Staging".to_string())
+        .await?;
+    projects.toggle_project_enabled("staging", false).await?;
+
+    let dao = RequestProcessingDao::new(store.clone());
+    let rule = RequestRule {
+        name: "staging rule".to_string(),
+        project: "staging".to_string(),
+        priority: 100,
+        capture: CaptureRule {
+            id: None,
+            match_expr: "example.com AND /api".to_string(),
+        },
+        ..Default::default()
+    };
+    let rule_id = dao.create_rule(rule).await?;
+
+    let request = make_request("GET", "https://example.com/api");
+    let matches = dao.find_matching_rules(&request).await?;
+    assert!(matches.iter().all(|matched| matched.id != Some(rule_id)));
+    Ok(())
+}

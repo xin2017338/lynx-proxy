@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { cloneDraft, draftToRequestRule, requestRuleToDraft, requestRuleToListItem } from './rules-mapper'
+import {
+  cloneDraft,
+  draftToRequestRule,
+  extractProxyForwardUrl,
+  requestRuleToDraft,
+  requestRuleToListItem,
+  sortRulesForDisplay,
+} from './rules-mapper'
 import type { RequestRuleDto } from './rules-types'
 
 const sampleRule: RequestRuleDto = {
@@ -144,5 +151,70 @@ describe('rules-mapper', () => {
     expect(copy).not.toBe(draft)
     copy.name = 'mutated'
     expect(draft.name).toBe('Test Rule')
+  })
+
+  it('extracts proxy forward url from first enabled handler', () => {
+    const url = extractProxyForwardUrl([
+      {
+        id: 1,
+        executionOrder: 10,
+        enabled: false,
+        handlerType: {
+          type: 'proxyForward',
+          targetScheme: 'https',
+          targetAuthority: 'disabled.example.com',
+        },
+      },
+      {
+        id: 2,
+        executionOrder: 20,
+        enabled: true,
+        handlerType: {
+          type: 'proxyForward',
+          targetScheme: 'https',
+          targetAuthority: 'staging.example.com',
+          targetPath: '/api',
+        },
+      },
+    ])
+    expect(url).toBe('https/wss://staging.example.com/api')
+  })
+
+  it('builds list item with forward url and effective enabled', () => {
+    const item = requestRuleToListItem({
+      ...sampleRule,
+      project: 'staging',
+      handlers: [
+        {
+          id: 11,
+          executionOrder: 10,
+          enabled: true,
+          handlerType: {
+            type: 'proxyForward',
+            targetScheme: 'https',
+            targetAuthority: 'staging.example.com',
+          },
+        },
+      ],
+    }, {
+      projectEnabledMap: new Map([['staging', false]]),
+      projectNameMap: new Map([['staging', 'Staging']]),
+    })
+
+    expect(item.forwardUrl).toBe('https/wss://staging.example.com')
+    expect(item.projectId).toBe('staging')
+    expect(item.projectName).toBe('Staging')
+    expect(item.effectiveEnabled).toBe(false)
+  })
+
+  it('sorts rules by forward url with empty urls last', () => {
+    const sorted = sortRulesForDisplay([
+      { id: '1', name: 'A', enabled: true, priority: 10, forwardUrl: 'https://b.example.com' },
+      { id: '2', name: 'B', enabled: true, priority: 20 },
+      { id: '3', name: 'C', enabled: true, priority: 30, forwardUrl: 'https://a.example.com' },
+      { id: '4', name: 'D', enabled: true, priority: 40, forwardUrl: 'https://a.example.com' },
+    ], 'forwardUrl')
+
+    expect(sorted.map(rule => rule.id)).toEqual(['4', '3', '1', '2'])
   })
 })

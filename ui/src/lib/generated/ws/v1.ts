@@ -40,6 +40,7 @@ export const WsOp = {
   ProjectsCreate: 'projects.create',
   ProjectsRename: 'projects.rename',
   ProjectsDelete: 'projects.delete',
+  ProjectsEnabledSet: 'projects.enabled.set',
   CaptureRulesFocusListGet: 'capture.rules.focus.list.get',
   CaptureRulesIgnoreListGet: 'capture.rules.ignore.list.get',
   CaptureRulesFocusUpsert: 'capture.rules.focus.upsert',
@@ -95,6 +96,7 @@ export type WsRequestOp =
   | 'projects.create'
   | 'projects.rename'
   | 'projects.delete'
+  | 'projects.enabled.set'
   | 'capture.rules.focus.list.get'
   | 'capture.rules.ignore.list.get'
   | 'capture.rules.focus.upsert'

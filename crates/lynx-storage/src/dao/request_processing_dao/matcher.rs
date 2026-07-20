@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use anyhow::Result;
 use axum::{body::HttpBody, extract::Request};
 use lynx_dsl::{MatchProgram, RequestFacts, compile_match_expr, eval_program};
@@ -31,12 +33,16 @@ impl RuleMatcher {
 
     pub fn find_matching_rules<T: HttpBody>(
         compiled_rules: &[CompiledRule],
+        disabled_project_ids: &HashSet<String>,
         request: &Request<T>,
     ) -> Result<Vec<RequestRule>> {
         let facts = request_facts_from_request(request);
         let mut matching = Vec::new();
         for compiled in compiled_rules {
             if !compiled.rule.enabled {
+                continue;
+            }
+            if disabled_project_ids.contains(&compiled.rule.project) {
                 continue;
             }
             if eval_program(&compiled.program, &facts) {

@@ -5,11 +5,17 @@ use std::sync::Arc;
 use crate::dao::request_processing_dao::types::DEFAULT_PROJECT_ID;
 use crate::storage::{DataStore, read_json_or_default, write_json_atomic};
 
+fn default_true() -> bool {
+    true
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct RuleProject {
     pub id: String,
     pub name: String,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -26,6 +32,7 @@ impl Default for ProjectsFile {
             projects: vec![RuleProject {
                 id: DEFAULT_PROJECT_ID.to_string(),
                 name: "Default".to_string(),
+                enabled: true,
             }],
         }
     }
@@ -80,10 +87,34 @@ impl ProjectsDao {
         if file.projects.iter().any(|p| p.id == id) {
             return Err(anyhow!("project already exists: {id}"));
         }
-        let project = RuleProject { id, name };
+        let project = RuleProject {
+            id,
+            name,
+            enabled: true,
+        };
         file.projects.push(project.clone());
         self.save_projects(file).await?;
         Ok(project)
+    }
+
+    pub async fn toggle_project_enabled(
+        &self,
+        project_id: &str,
+        enabled: bool,
+    ) -> Result<RuleProject> {
+        if project_id == DEFAULT_PROJECT_ID && !enabled {
+            return Err(anyhow!("cannot disable default project"));
+        }
+        let mut file = self.ensure_default().await?;
+        let project = file
+            .projects
+            .iter_mut()
+            .find(|p| p.id == project_id)
+            .ok_or_else(|| anyhow!("project not found: {project_id}"))?;
+        project.enabled = enabled;
+        let updated = project.clone();
+        self.save_projects(file).await?;
+        Ok(updated)
     }
 
     pub async fn rename_project(&self, project_id: &str, name: String) -> Result<RuleProject> {
@@ -113,5 +144,45 @@ impl ProjectsDao {
             file.active_project_id = DEFAULT_PROJECT_ID.to_string();
         }
         self.save_projects(file).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[tokio::test]
+    async fn toggle_project_enabled_rejects_default_disable() -> Result<()> {
+        let dir = tempdir()?;
+        let store = DataStore::new(dir.path()).await?;
+        let dao = ProjectsDao::new(store);
+        let err = dao
+            .toggle_project_enabled(DEFAULT_PROJECT_ID, false)
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("cannot disable default project"));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn toggle_project_enabled_persists_state() -> Result<()> {
+        let dir = tempdir()?;
+        let store = DataStore::new(dir.path()).await?;
+        let dao = ProjectsDao::new(store.clone());
+        dao.create_project("staging".to_string(), "Staging".to_string())
+            .await?;
+
+        let updated = dao.toggle_project_enabled("staging", false).await?;
+        assert!(!updated.enabled);
+
+        let file = dao.get_projects().await?;
+        let staging = file
+            .projects
+            .iter()
+            .find(|project| project.id == "staging")
+            .unwrap();
+        assert!(!staging.enabled);
+        Ok(())
     }
 }

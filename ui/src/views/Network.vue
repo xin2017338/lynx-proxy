@@ -8,7 +8,7 @@ import { CaptureRulesPopover, NetworkRequestPanel, TrafficMatchFilterInput, type
 import { RulesAssetsDrawer } from '@/components/ui/rules-drawer'
 import { useTrafficFilterHistory } from '@/composables/useTrafficFilterHistory'
 import { useTrafficMatchFilter } from '@/composables/useTrafficMatchFilter'
-import { useCaptureStore, useRequestStreamStore, useRulesStore, useSettingsStore, useWsConnectionStore } from '@/stores'
+import { useCaptureStore, useGeneralSettingsStore, useRequestStreamStore, useRulesStore, useSettingsStore, useWsConnectionStore } from '@/stores'
 import { Disc2, ListTree, PlugZap, BrushCleaning, Sheet, Scale, Crosshair } from '@lucide/vue'
 import { cn } from '@/lib/utils'
 
@@ -16,6 +16,7 @@ const captureStore = useCaptureStore()
 const requestStreamStore = useRequestStreamStore()
 const wsConnectionStore = useWsConnectionStore()
 const settingsStore = useSettingsStore()
+const generalSettingsStore = useGeneralSettingsStore()
 const rulesStore = useRulesStore()
 const {
   open: rulesDrawerOpen,
@@ -33,11 +34,21 @@ const {
   trafficFilterDsl,
 } = storeToRefs(settingsStore)
 
+const { hideConnectTunnels } = storeToRefs(generalSettingsStore)
+
 const {
   entries: trafficFilterHistory,
   push: pushTrafficFilterHistory,
   clear: clearTrafficFilterHistory,
 } = useTrafficFilterHistory()
+
+const visibleTrafficRecords = computed(() => {
+  const records = requestStreamStore.trafficRecords
+  if (!hideConnectTunnels.value) {
+    return records
+  }
+  return records.filter(record => record.method?.toUpperCase() !== 'CONNECT')
+})
 
 const {
   filteredRecords,
@@ -46,7 +57,7 @@ const {
   applyFilter,
 } = useTrafficMatchFilter({
   filterDsl: trafficFilterDsl,
-  trafficRecords: computed(() => requestStreamStore.trafficRecords),
+  trafficRecords: visibleTrafficRecords,
   recordsByTrace: computed(() => requestStreamStore.recordsByTrace),
 })
 

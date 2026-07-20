@@ -1,9 +1,63 @@
 import type { RuleDraft, RuleActionDraft, RuleHeaderPair, RuleWorkbenchRuleItem } from '@/components/ui/rule-workbench'
 import { createAction, createRuleDraft } from '@/components/ui/rule-workbench'
-import { proxyForwardSchemeFromDto } from '@/components/ui/rule-workbench/proxy-forward-scheme'
+import { proxyForwardSchemeFromDto, proxyForwardSchemeSummaryLabel } from '@/components/ui/rule-workbench/proxy-forward-scheme'
 import { getRuleValidationErrors } from '@/components/ui/rule-workbench/match-validation'
 import type { ActionAssetTemplate } from '@/components/ui/rules-drawer/types'
 import type { HandlerRuleDto, HandlerRuleTypeDto, RequestRuleDto } from './rules-types'
+
+export interface RequestRuleToListItemOptions {
+  projectEnabledMap?: Map<string, boolean>
+  projectNameMap?: Map<string, string>
+}
+
+function isProjectEnabled(
+  projectId: string,
+  projectEnabledMap?: Map<string, boolean>,
+): boolean {
+  if (!projectEnabledMap) return true
+  return projectEnabledMap.get(projectId) ?? true
+}
+
+/** First enabled proxyForward handler URL summary, or undefined. */
+export function extractProxyForwardUrl(handlers: HandlerRuleDto[]): string | undefined {
+  for (const handler of handlers) {
+    if (!handler.enabled) continue
+    const handlerType = handler.handlerType as HandlerRuleTypeDto
+    if (handlerType.type !== 'proxyForward') continue
+    const scheme = proxyForwardSchemeSummaryLabel(handlerType.targetScheme ?? '')
+    const authority = (handlerType.targetAuthority ?? '').trim() || '<authority>'
+    const path = (handlerType.targetPath ?? '').trim() || ''
+    return `${scheme}://${authority}${path}`
+  }
+  return undefined
+}
+
+export function requestRuleToListItem(
+  rule: RequestRuleDto,
+  options?: RequestRuleToListItemOptions,
+): RuleWorkbenchRuleItem {
+  const draft = requestRuleToDraft(rule)
+  const errors = getRuleValidationErrors(draft)
+  const summary = rule.capture.matchExpr.length > 80
+    ? `${rule.capture.matchExpr.slice(0, 77)}...`
+    : rule.capture.matchExpr
+  const projectId = rule.project ?? 'default'
+  const projectEnabled = isProjectEnabled(projectId, options?.projectEnabledMap)
+  const forwardUrl = extractProxyForwardUrl(rule.handlers)
+
+  return {
+    id: ruleIdToString(rule.id),
+    name: rule.name,
+    enabled: rule.enabled,
+    effectiveEnabled: projectEnabled && rule.enabled,
+    priority: rule.priority,
+    summary,
+    forwardUrl,
+    projectId,
+    projectName: options?.projectNameMap?.get(projectId),
+    state: errors.length > 0 ? 'invalid' : 'valid',
+  }
+}
 
 function normalizeThrottlePreset(raw?: string): 'Fast3G' | 'Slow3G' | 'Offline' | 'Custom' {
   const value = (raw ?? '').trim()
@@ -261,22 +315,6 @@ export function draftToRequestRule(draft: RuleDraft, fallbackProject = 'default'
   }
 }
 
-export function requestRuleToListItem(rule: RequestRuleDto): RuleWorkbenchRuleItem {
-  const draft = requestRuleToDraft(rule)
-  const errors = getRuleValidationErrors(draft)
-  const summary = rule.capture.matchExpr.length > 80
-    ? `${rule.capture.matchExpr.slice(0, 77)}...`
-    : rule.capture.matchExpr
-
-  return {
-    id: ruleIdToString(rule.id),
-    name: rule.name,
-    enabled: rule.enabled,
-    priority: rule.priority,
-    summary,
-    state: errors.length > 0 ? 'invalid' : 'valid',
-  }
-}
 
 export function templateToAsset(template: HandlerRuleDto, index: number): ActionAssetTemplate | null {
   const action = handlerTypeToAction(template, index)
@@ -293,4 +331,28 @@ export function templateToAsset(template: HandlerRuleDto, index: number): Action
 /** Plain JSON clone — works on Vue reactive proxies (structuredClone cannot). */
 export function cloneDraft(draft: RuleDraft): RuleDraft {
   return JSON.parse(JSON.stringify(draft)) as RuleDraft
+}
+
+export type RuleListSortMode = 'priority' | 'forwardUrl'
+
+export function sortRulesForDisplay(
+  rules: RuleWorkbenchRuleItem[],
+  sortMode: RuleListSortMode,
+): RuleWorkbenchRuleItem[] {
+  if (sortMode === 'priority') {
+    return [...rules]
+  }
+
+  return [...rules].sort((left, right) => {
+    const leftUrl = left.forwardUrl
+    const rightUrl = right.forwardUrl
+    if (!leftUrl && !rightUrl) {
+      return right.priority - left.priority || left.name.localeCompare(right.name)
+    }
+    if (!leftUrl) return 1
+    if (!rightUrl) return -1
+    const urlCompare = leftUrl.localeCompare(rightUrl)
+    if (urlCompare !== 0) return urlCompare
+    return right.priority - left.priority || left.name.localeCompare(right.name)
+  })
 }

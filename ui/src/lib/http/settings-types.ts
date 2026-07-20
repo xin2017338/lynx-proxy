@@ -1,6 +1,8 @@
 export interface GeneralSetting {
   maxLogSize: number
   language: string
+  /** When true (default), Network list hides CONNECT tunnel rows. */
+  hideConnectTunnels?: boolean
 }
 
 export interface DomainFilter {

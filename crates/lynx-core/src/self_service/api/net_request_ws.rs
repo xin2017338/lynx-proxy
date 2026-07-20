@@ -1277,6 +1277,77 @@ async fn handle_client_request(
                 }
             }
         }
+        op::PROJECTS_ENABLED_SET => {
+            let Some(payload) = frame.payload.clone() else {
+                send_frame(
+                    socket_tx,
+                    error_frame(
+                        frame.id,
+                        frame.op,
+                        "INVALID_PAYLOAD",
+                        "Missing payload",
+                        None,
+                    ),
+                )
+                .await;
+                return;
+            };
+            let Some(project_id) = payload.get("projectId").and_then(Value::as_str) else {
+                send_frame(
+                    socket_tx,
+                    error_frame(
+                        frame.id,
+                        frame.op,
+                        "INVALID_PAYLOAD",
+                        "Missing payload.projectId",
+                        None,
+                    ),
+                )
+                .await;
+                return;
+            };
+            let Some(enabled) = payload.get("enabled").and_then(Value::as_bool) else {
+                send_frame(
+                    socket_tx,
+                    error_frame(
+                        frame.id,
+                        frame.op,
+                        "INVALID_PAYLOAD",
+                        "Missing payload.enabled",
+                        None,
+                    ),
+                )
+                .await;
+                return;
+            };
+
+            match projects_service::set_project_enabled(state, project_id, enabled).await {
+                Ok(project) => {
+                    send_frame(
+                        socket_tx,
+                        response_frame(
+                            frame.id,
+                            frame.op,
+                            serde_json::to_value(project).unwrap_or_default(),
+                        ),
+                    )
+                    .await;
+                }
+                Err(err) => {
+                    send_frame(
+                        socket_tx,
+                        error_frame(
+                            frame.id,
+                            frame.op,
+                            "DB_ERROR",
+                            "Failed to set project enabled",
+                            Some(json!({ "reason": err.to_string() })),
+                        ),
+                    )
+                    .await;
+                }
+            }
+        }
 
         op::CAPTURE_RULES_FOCUS_LIST_GET => match capture_rules_service::list_focus(state).await {
             Ok(rules) => {

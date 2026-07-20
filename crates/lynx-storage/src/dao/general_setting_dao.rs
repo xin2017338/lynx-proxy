@@ -3,12 +3,18 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+fn default_true() -> bool {
+    true
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct GeneralSetting {
     pub max_log_size: i32,
     #[serde(default)]
     pub language: String,
+    #[serde(default = "default_true")]
+    pub hide_connect_tunnels: bool,
 }
 
 impl Default for GeneralSetting {
@@ -16,6 +22,7 @@ impl Default for GeneralSetting {
         Self {
             max_log_size: 5000,
             language: "zh-CN".to_string(),
+            hide_connect_tunnels: true,
         }
     }
 }

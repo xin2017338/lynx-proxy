@@ -3,12 +3,13 @@ import type { HTMLAttributes } from 'vue'
 import { computed, ref, watch } from 'vue'
 import Draggable from 'vuedraggable'
 import Sortable from 'sortablejs'
-import { GripVertical, ListFilter, Plus } from '@lucide/vue'
+import { ArrowDownUp, GripVertical, ListFilter, Plus } from '@lucide/vue'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import type { RuleWorkbenchRuleItem } from '@/components/ui/rule-workbench'
-import { drawerEmptyStateClass, drawerListItemClass, drawerSearchInputClass } from './drawer-styles'
+import { type RuleListSortMode, sortRulesForDisplay } from '@/lib/ws/rules-mapper'
+import { drawerEmptyStateClass, drawerFilterChipClass, drawerListItemClass, drawerSearchInputClass } from './drawer-styles'
 import {
   clearDraggingRuleIds,
   draggingRuleIds,
@@ -27,10 +28,12 @@ const props = withDefaults(defineProps<{
   rules: RuleWorkbenchRuleItem[]
   selectedRuleId?: string
   reordering?: boolean
+  showAllProjects?: boolean
   class?: HTMLAttributes['class']
 }>(), {
   selectedRuleId: '',
   reordering: false,
+  showAllProjects: false,
 })
 
 const emit = defineEmits<{
@@ -45,6 +48,7 @@ const emit = defineEmits<{
 }>()
 
 const searchTerm = ref('')
+const sortMode = ref<RuleListSortMode>('priority')
 const localRules = ref<RuleWorkbenchRuleItem[]>([])
 const listRootRef = ref<HTMLElement | null>(null)
 
@@ -67,37 +71,43 @@ const filteredRules = computed(() => {
   return props.rules.filter(rule => (
     rule.name.toLowerCase().includes(keyword)
     || (rule.summary ?? '').toLowerCase().includes(keyword)
+    || (rule.forwardUrl ?? '').toLowerCase().includes(keyword)
+    || (rule.projectName ?? '').toLowerCase().includes(keyword)
   ))
 })
 
-const visibleRuleIds = computed(() => filteredRules.value.map(r => r.id))
+const displayedRules = computed(() => sortRulesForDisplay(filteredRules.value, sortMode.value))
+
+const visibleRuleIds = computed(() => displayedRules.value.map(r => r.id))
 const allVisibleSelected = computed(() => isAllSelected(visibleRuleIds.value))
 const anyVisibleSelected = computed(() => isAnySelected(visibleRuleIds.value))
 const someVisibleSelected = computed(() => anyVisibleSelected.value && !allVisibleSelected.value)
 
 const orderedRuleIds = computed(() => localRules.value.map(rule => rule.id))
 
-// Determine if all selected rules are enabled for bulk toggle
 const allSelectedEnabled = computed(() => {
   if (selectedIds.value.size === 0) return false
-  const selectedRules = filteredRules.value.filter(rule => selectedIds.value.has(rule.id))
+  const selectedRules = displayedRules.value.filter(rule => selectedIds.value.has(rule.id))
   return selectedRules.length > 0 && selectedRules.every(rule => rule.enabled)
 })
 
-// Handle bulk toggle switch change
 function handleBulkToggle() {
   if (selectedIds.value.size === 0) return
-  // Toggle: if all are enabled, disable all; otherwise enable all
   const newState = !allSelectedEnabled.value
   emit('bulk-toggle', Array.from(selectedIds.value), newState)
 }
 
-watch(filteredRules, (next) => {
+watch(displayedRules, (next) => {
   localRules.value = [...next]
   pruneSelection(next.map(rule => rule.id))
 }, { immediate: true })
 
-const dragDisabled = computed(() => props.reordering || searchTerm.value.trim().length > 0)
+const dragDisabled = computed(() => (
+  props.reordering
+  || searchTerm.value.trim().length > 0
+  || sortMode.value === 'forwardUrl'
+  || props.showAllProjects
+))
 
 function toggleSelectAllVisible() {
   const ids = visibleRuleIds.value
@@ -179,8 +189,6 @@ function setDragData(dataTransfer: DataTransfer, dragEl: HTMLElement) {
 }
 
 function onRuleRowClick(rule: RuleWorkbenchRuleItem, index: number, ev: MouseEvent) {
-  // Click toggles selection (card highlight is selection state).
-  // Editing is done via the explicit buttons.
   void index
   void ev
   toggleSelected(rule.id)
@@ -191,6 +199,12 @@ function onListBackgroundClick() {
 }
 
 function dragHandleTitle(ruleId: string) {
+  if (dragDisabled.value && props.showAllProjects) {
+    return '全览模式下不可拖拽排序'
+  }
+  if (dragDisabled.value && sortMode.value === 'forwardUrl') {
+    return '按转发 URL 排序时不可拖拽'
+  }
   const count = selectedCount.value
   if (count > 1 && isSelected(ruleId)) {
     return `拖拽排序；将移动 ${count} 条规则`
@@ -209,6 +223,32 @@ function ruleStateClass(state?: RuleWorkbenchRuleItem['state']) {
   if (state === 'valid') return 'text-emerald-600'
   return 'text-muted-foreground'
 }
+
+function isEffectivelyEnabled(rule: RuleWorkbenchRuleItem): boolean {
+  return rule.effectiveEnabled ?? rule.enabled
+}
+
+function ruleSwitchTitle(rule: RuleWorkbenchRuleItem): string | undefined {
+  if (rule.enabled && rule.effectiveEnabled === false) {
+    return '项目已禁用，规则暂不生效'
+  }
+  return undefined
+}
+
+function sharesForwardUrlWithPrevious(index: number): boolean {
+  if (sortMode.value !== 'forwardUrl' || index <= 0) return false
+  const current = localRules.value[index]?.forwardUrl
+  const previous = localRules.value[index - 1]?.forwardUrl
+  return !!current && current === previous
+}
+
+function startsForwardUrlGroup(index: number): boolean {
+  if (sortMode.value !== 'forwardUrl') return false
+  const current = localRules.value[index]?.forwardUrl
+  if (!current) return false
+  if (index === 0) return true
+  return localRules.value[index - 1]?.forwardUrl !== current
+}
 </script>
 
 <template>
@@ -221,7 +261,7 @@ function ruleStateClass(state?: RuleWorkbenchRuleItem['state']) {
           type="text"
           inputmode="search"
           :class="[drawerSearchInputClass, 'pl-7 pr-2']"
-          placeholder="搜索规则"
+          placeholder="搜索规则、转发 URL"
         >
       </div>
 
@@ -229,6 +269,24 @@ function ruleStateClass(state?: RuleWorkbenchRuleItem['state']) {
         <Plus class="h-3.5 w-3.5" />
         新建
       </Button>
+    </div>
+
+    <div class="flex items-center gap-2 px-2 pb-2">
+      <ArrowDownUp class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+      <button
+        type="button"
+        :class="drawerFilterChipClass(sortMode === 'priority')"
+        @click="sortMode = 'priority'"
+      >
+        优先级
+      </button>
+      <button
+        type="button"
+        :class="drawerFilterChipClass(sortMode === 'forwardUrl')"
+        @click="sortMode = 'forwardUrl'"
+      >
+        转发 URL
+      </button>
     </div>
 
     <div class="flex items-center justify-between gap-2 px-2 pb-2">
@@ -268,7 +326,7 @@ function ruleStateClass(state?: RuleWorkbenchRuleItem['state']) {
     </div>
 
     <div class="min-h-0 flex-1 overflow-auto px-2 pb-2 scrollbar-gutter-stable" @click.self="onListBackgroundClick">
-      <div v-if="filteredRules.length === 0" :class="drawerEmptyStateClass">
+      <div v-if="displayedRules.length === 0" :class="drawerEmptyStateClass">
         没有匹配当前筛选条件的规则。
       </div>
 
@@ -293,12 +351,19 @@ function ruleStateClass(state?: RuleWorkbenchRuleItem['state']) {
         @end="onDragEnd"
       >
         <template #item="{ element: rule, index }">
-          <li :data-rule-id="rule.id">
+          <li
+            :data-rule-id="rule.id"
+            :class="cn(
+              startsForwardUrlGroup(index) && 'pt-1',
+            )"
+          >
             <div
               :class="cn(
                 drawerListItemClass(isSelected(rule.id)),
                 'cursor-default',
-                !rule.enabled && 'opacity-70',
+                !isEffectivelyEnabled(rule) && 'opacity-70',
+                sharesForwardUrlWithPrevious(index) && 'border-t border-primary/20 bg-primary/[0.03]',
+                startsForwardUrlGroup(index) && rule.forwardUrl && 'ring-1 ring-primary/15',
               )"
               @click="onRuleRowClick(rule, index, $event)"
             >
@@ -318,6 +383,7 @@ function ruleStateClass(state?: RuleWorkbenchRuleItem['state']) {
                 <div class="pt-0.5" @click.stop>
                   <Switch
                     :checked="rule.enabled"
+                    :title="ruleSwitchTitle(rule)"
                     :aria-label="rule.enabled ? `禁用 ${rule.name}` : `启用 ${rule.name}`"
                     @update:checked="emit('toggle-enabled', rule.id, $event)"
                   />
@@ -325,13 +391,28 @@ function ruleStateClass(state?: RuleWorkbenchRuleItem['state']) {
 
                 <div class="min-w-0 flex-1 select-none text-left">
                   <div class="flex items-center justify-between gap-2">
-                    <p class="truncate text-xs font-semibold text-foreground">{{ rule.name }}</p>
+                    <div class="flex min-w-0 items-center gap-1.5">
+                      <p class="truncate text-xs font-semibold text-foreground">{{ rule.name }}</p>
+                      <span
+                        v-if="showAllProjects && rule.projectName"
+                        class="shrink-0 rounded-sm bg-muted px-1 py-0.5 text-[10px] text-muted-foreground"
+                      >
+                        {{ rule.projectName }}
+                      </span>
+                    </div>
                     <span class="shrink-0 text-[10px] font-medium" :class="ruleStateClass(rule.state)">
                       {{ ruleStateLabel(rule.state) }}
                     </span>
                   </div>
                   <p class="mt-1 line-clamp-2 text-[11px] leading-4 text-muted-foreground">
                     {{ rule.summary || '暂无摘要。' }}
+                  </p>
+                  <p
+                    v-if="rule.forwardUrl"
+                    class="mt-0.5 truncate font-mono text-[10px] text-primary/80"
+                    :title="rule.forwardUrl"
+                  >
+                    → {{ rule.forwardUrl }}
                   </p>
                 </div>
               </div>
@@ -374,7 +455,6 @@ function ruleStateClass(state?: RuleWorkbenchRuleItem['state']) {
   opacity: 0.85;
 }
 
-/* Sortable MultiDrag adds class to the draggable item (li). Style the card (child div). */
 :deep(li.sortable-selected > div) {
   border-color: hsl(var(--primary) / 0.45);
   background-color: hsl(var(--primary) / 0.05);

@@ -4,6 +4,7 @@ import { computed, nextTick, ref, watch } from 'vue'
 import { Plus } from '@lucide/vue'
 import { cn } from '@/lib/utils'
 import { apiStudioTreeRenameInputClass } from '@/components/ui/api-studio/api-studio-styles'
+import { Switch } from '@/components/ui/switch'
 import type { RuleProjectDto } from '@/lib/ws/rules-types'
 import { drawerListItemClass } from './drawer-styles'
 import {
@@ -26,6 +27,7 @@ const emit = defineEmits<{
   create: [name: string]
   rename: [projectId: string, name: string]
   moveRules: [ruleIds: string[], projectId: string]
+  'toggle-enabled': [projectId: string, enabled: boolean]
 }>()
 
 const dropTargetProjectId = ref<string | null>(null)
@@ -47,14 +49,19 @@ const sortedProjects = computed(() => (
 
 const isEditing = computed(() => isCreating.value || renamingProjectId.value != null)
 
-function projectItemClass(active: boolean, dropTarget = false) {
+function projectItemClass(active: boolean, dropTarget = false, disabled = false) {
   return cn(
     drawerListItemClass(active || dropTarget),
     dropTarget && 'border-primary bg-primary/5',
     'w-full text-left text-xs font-medium transition-colors',
     !active && !dropTarget && 'text-muted-foreground hover:text-foreground',
     active && 'text-foreground',
+    disabled && 'opacity-60',
   )
+}
+
+function isProjectEnabled(project: RuleProjectDto): boolean {
+  return project.enabled !== false
 }
 
 function isRuleDrag(ev: DragEvent) {
@@ -246,24 +253,44 @@ watch(() => props.error, (error) => {
               @mousedown.stop
             >
           </div>
-          <button
+          <div
             v-else
-            type="button"
-            :disabled="isEditing || saving"
             :class="projectItemClass(
               activeProjectId === project.id,
               dropTargetProjectId === project.id,
+              !isProjectEnabled(project),
             )"
-            :title="project.id === 'default' ? project.name : `${project.name}（双击重命名）`"
-            @click="selectProject(project.id)"
-            @dblclick.prevent="startRenaming(project)"
-            @dragover="onProjectDragOver(project.id, $event)"
-            @dragenter="onProjectDragEnter(project.id, $event)"
-            @dragleave="onProjectDragLeave(project.id, $event)"
-            @drop="onProjectDrop(project.id, $event)"
           >
-            <span class="block truncate">{{ project.name }}</span>
-          </button>
+            <div class="flex items-center gap-2">
+              <button
+                type="button"
+                class="min-w-0 flex-1 text-left"
+                :disabled="isEditing || saving"
+                :title="project.id === 'default'
+                  ? project.name
+                  : `${project.name}（双击重命名）${!isProjectEnabled(project) ? ' · 已禁用' : ''}`"
+                @click="selectProject(project.id)"
+                @dblclick.prevent="startRenaming(project)"
+                @dragover="onProjectDragOver(project.id, $event)"
+                @dragenter="onProjectDragEnter(project.id, $event)"
+                @dragleave="onProjectDragLeave(project.id, $event)"
+                @drop="onProjectDrop(project.id, $event)"
+              >
+                <span class="block truncate">{{ project.name }}</span>
+              </button>
+              <div
+                v-if="project.id !== 'default'"
+                class="shrink-0"
+                @click.stop
+              >
+                <Switch
+                  :checked="isProjectEnabled(project)"
+                  :aria-label="isProjectEnabled(project) ? `禁用项目 ${project.name}` : `启用项目 ${project.name}`"
+                  @update:checked="emit('toggle-enabled', project.id, $event)"
+                />
+              </div>
+            </div>
+          </div>
         </li>
 
         <li v-if="isCreating">

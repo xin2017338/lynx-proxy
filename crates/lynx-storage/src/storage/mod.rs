@@ -1,6 +1,7 @@
 mod id;
 mod json_file;
 
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -12,6 +13,7 @@ use tokio::sync::RwLock;
 use crate::dao::capture_rules_dao::CaptureRules;
 use crate::dao::client_proxy_dao::ClientProxyConfig;
 use crate::dao::net_request_dao::CaptureSwitch;
+use crate::dao::projects_dao::ProjectsFile;
 use crate::dao::request_processing_dao::matcher::{CompiledRule, RuleMatcher};
 use crate::dao::request_processing_dao::types::RequestRule;
 use crate::dao::traffic_filter_history_dao::TrafficFilterHistory;
@@ -23,6 +25,7 @@ pub use json_file::{read_json, read_json_or_default, write_json_atomic};
 pub struct RulesCacheEntry {
     pub rules: Vec<RequestRule>,
     pub compiled: Vec<CompiledRule>,
+    pub disabled_project_ids: HashSet<String>,
 }
 
 pub struct DataStore {
@@ -155,7 +158,22 @@ impl DataStore {
                 "Failed to load rules: {error}. If you upgraded to matchExpr, please clear the rules directory and recreate rules."
             )
         })?;
-        Ok(RulesCacheEntry { rules, compiled })
+        let disabled_project_ids = self.load_disabled_project_ids().await?;
+        Ok(RulesCacheEntry {
+            rules,
+            compiled,
+            disabled_project_ids,
+        })
+    }
+
+    async fn load_disabled_project_ids(&self) -> Result<HashSet<String>> {
+        let file: ProjectsFile = read_json_or_default(&self.setting_path("projects")).await?;
+        Ok(file
+            .projects
+            .iter()
+            .filter(|project| !project.enabled)
+            .map(|project| project.id.clone())
+            .collect())
     }
 
     pub async fn next_rule_id(&self) -> Result<i32> {

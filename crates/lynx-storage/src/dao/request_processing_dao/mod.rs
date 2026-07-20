@@ -110,7 +110,11 @@ impl RequestProcessingDao {
         request: &Request<T>,
     ) -> Result<Vec<RequestRule>> {
         let entry = self.store.get_rules_cache_entry().await?;
-        RuleMatcher::find_matching_rules(&entry.compiled, request)
+        RuleMatcher::find_matching_rules(
+            &entry.compiled,
+            &entry.disabled_project_ids,
+            request,
+        )
     }
 
     pub async fn get_template_handlers(&self) -> Result<Vec<HandlerRule>> {

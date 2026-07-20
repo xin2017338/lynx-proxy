@@ -56,7 +56,10 @@ const downloadLinks = computed(() => {
 
 async function loadAll() {
   if (props.preview) {
-    general.value = { ...props.preview.general }
+    general.value = {
+      ...props.preview.general,
+      hideConnectTunnels: props.preview.general.hideConnectTunnels !== false,
+    }
     capture.value = structuredClone(props.preview.capture)
     certPath.value = props.preview.certPath
     baseAddresses.value = [...props.preview.baseAddresses]
@@ -75,8 +78,13 @@ async function loadAll() {
       fetchBaseAddresses(),
     ])
 
-    general.value = generalData
+    const hideConnect = generalData.hideConnectTunnels !== false
+    general.value = {
+      ...generalData,
+      hideConnectTunnels: hideConnect,
+    }
     generalSettingsStore.applyMaxLogSize(generalData.maxLogSize)
+    generalSettingsStore.applyHideConnectTunnels(hideConnect)
     capture.value = captureData
     certPath.value = pathResult.path
     baseAddresses.value = addresses
@@ -105,10 +113,14 @@ async function saveAll() {
     }
 
     await Promise.all([
-      wsConnection.call(WsOp.SettingsGeneralSet, general.value),
+      wsConnection.call(WsOp.SettingsGeneralSet, {
+        ...general.value,
+        hideConnectTunnels: general.value.hideConnectTunnels !== false,
+      }),
       wsConnection.call(WsOp.SettingsCaptureFilterSet, capture.value),
     ])
     generalSettingsStore.applyMaxLogSize(general.value.maxLogSize)
+    generalSettingsStore.applyHideConnectTunnels(general.value.hideConnectTunnels !== false)
     saveMessage.value = '已保存'
   } catch (err) {
     saveMessage.value = err instanceof Error ? err.message : String(err)
@@ -223,6 +235,16 @@ onMounted(() => {
             :max="MAX_LOG_SIZE_MAX"
             :class="cn(settingsMonoFieldClass, 'w-16')"
           >
+        </div>
+        <div :class="settingsRowGridClass">
+          <span :class="settingsLabelClass">隐藏 CONNECT 隧道</span>
+          <div class="justify-self-start">
+            <Switch
+              :checked="general.hideConnectTunnels !== false"
+              :disabled="saving || isPreview"
+              @update:checked="general.hideConnectTunnels = $event"
+            />
+          </div>
         </div>
       </section>
 

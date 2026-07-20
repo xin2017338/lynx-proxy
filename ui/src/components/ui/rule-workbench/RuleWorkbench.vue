@@ -18,8 +18,12 @@ export interface RuleWorkbenchRuleItem {
   id: string
   name: string
   enabled: boolean
+  effectiveEnabled?: boolean
   priority: number
   summary?: string
+  forwardUrl?: string
+  projectId?: string
+  projectName?: string
   state?: 'draft' | 'valid' | 'invalid'
 }
 
@@ -80,13 +84,24 @@ watch(draftLocal, (next) => {
 const filteredRules = computed(() => {
   const keyword = searchTerm.value.trim().toLowerCase()
   if (!keyword) return props.rules
-  return props.rules.filter(rule => {
-    return (
-      rule.name.toLowerCase().includes(keyword)
-      || (rule.summary ?? '').toLowerCase().includes(keyword)
-    )
-  })
+  return props.rules.filter(rule => (
+    rule.name.toLowerCase().includes(keyword)
+    || (rule.summary ?? '').toLowerCase().includes(keyword)
+    || (rule.forwardUrl ?? '').toLowerCase().includes(keyword)
+    || (rule.projectName ?? '').toLowerCase().includes(keyword)
+  ))
 })
+
+function isEffectivelyEnabled(rule: RuleWorkbenchRuleItem): boolean {
+  return rule.effectiveEnabled ?? rule.enabled
+}
+
+function ruleSwitchTitle(rule: RuleWorkbenchRuleItem): string | undefined {
+  if (rule.enabled && rule.effectiveEnabled === false) {
+    return '项目已禁用，规则暂不生效'
+  }
+  return undefined
+}
 
 const selectedRule = computed(() => {
   return props.rules.find(rule => rule.id === selectedRuleIdLocal.value) ?? filteredRules.value[0]
@@ -230,7 +245,7 @@ function ruleStateClass(state?: RuleWorkbenchRuleItem['state']) {
               v-model="searchTerm"
               type="search"
               class="h-7 w-full rounded-sm border border-input bg-background pl-7 pr-2 text-xs text-foreground outline-none ring-ring transition-colors placeholder:text-muted-foreground focus:ring-1"
-              placeholder="搜索规则"
+              placeholder="搜索规则、转发 URL"
             >
           </div>
         </div>
@@ -246,12 +261,13 @@ function ruleStateClass(state?: RuleWorkbenchRuleItem['state']) {
                 rule.id === selectedRule?.id
                   ? 'bg-primary/10 shadow-sm ring-1 ring-primary/35'
                   : 'bg-background/80 hover:bg-accent/50',
-                !rule.enabled && 'opacity-70',
+                !isEffectivelyEnabled(rule) && 'opacity-70',
               ]"
             >
               <div class="pt-0.5" @click.stop>
                 <Switch
                   :checked="rule.enabled"
+                  :title="ruleSwitchTitle(rule)"
                   :aria-label="rule.enabled ? `禁用 ${rule.name}` : `启用 ${rule.name}`"
                   @update:checked="emit('toggle-enabled', rule.id, $event)"
                 />
@@ -262,13 +278,28 @@ function ruleStateClass(state?: RuleWorkbenchRuleItem['state']) {
                 @click="updateSelectedRule(rule.id)"
               >
                 <div class="flex items-center justify-between gap-2">
-                  <p class="truncate text-xs font-semibold text-foreground">{{ rule.name }}</p>
+                  <div class="flex min-w-0 items-center gap-1.5">
+                    <p class="truncate text-xs font-semibold text-foreground">{{ rule.name }}</p>
+                    <span
+                      v-if="rule.projectName"
+                      class="shrink-0 rounded-sm bg-muted px-1 py-0.5 text-[10px] text-muted-foreground"
+                    >
+                      {{ rule.projectName }}
+                    </span>
+                  </div>
                   <span class="shrink-0 text-[10px] font-medium" :class="ruleStateClass(rule.state)">
                     {{ ruleStateLabel(rule.state) }}
                   </span>
                 </div>
                 <p class="mt-1 line-clamp-2 text-[11px] leading-4 text-muted-foreground">
                   {{ rule.summary || '暂无摘要。' }}
+                </p>
+                <p
+                  v-if="rule.forwardUrl"
+                  class="mt-0.5 truncate font-mono text-[10px] text-primary/80"
+                  :title="rule.forwardUrl"
+                >
+                  → {{ rule.forwardUrl }}
                 </p>
               </button>
             </div>

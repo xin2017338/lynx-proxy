@@ -42,6 +42,26 @@ export const useRulesStore = defineStore('rules', () => {
   const quickOverrideDraftIds = new Map<string, string>()
   let lastRulesDtoById = new Map<string, RequestRuleDto>()
 
+  function buildListItemOptions() {
+    const projectEnabledMap = new Map(
+      projects.value.map(project => [project.id, project.enabled !== false]),
+    )
+    const projectNameMap = new Map(
+      projects.value.map(project => [project.id, project.name]),
+    )
+    return { projectEnabledMap, projectNameMap }
+  }
+
+  function mapRulesToListItems(list: RequestRuleDto[]): RuleWorkbenchRuleItem[] {
+    const options = buildListItemOptions()
+    return list.map(rule => requestRuleToListItem(rule, options))
+  }
+
+  function resolveRuleProject(explicitProject?: string): string {
+    if (activeProjectId.value !== 'default') return activeProjectId.value
+    return explicitProject ?? 'default'
+  }
+
   function stableDraftId(prefix: string, key: string): string {
     let hash = 0
     for (let i = 0; i < key.length; i += 1) {
@@ -71,13 +91,16 @@ export const useRulesStore = defineStore('rules', () => {
     loading.value = true
     error.value = null
     try {
+      const payload = activeProjectId.value === 'default'
+        ? {}
+        : { projectId: activeProjectId.value }
       const result = await wsConnectionStore.call<RulesListResponse>(
         WsOp.RulesListGet,
-        { projectId: activeProjectId.value },
+        payload,
       )
       const list = result?.rules ?? []
       lastRulesDtoById = new Map(list.map(rule => [ruleIdToString(rule.id), rule]))
-      rules.value = list.map(requestRuleToListItem)
+      rules.value = mapRulesToListItems(list)
     } catch (err) {
       error.value = String(err)
       throw err
@@ -106,7 +129,7 @@ export const useRulesStore = defineStore('rules', () => {
   async function loadRuleDraft(ruleId: string) {
     const numericId = parseRuleId(ruleId)
     if (numericId == null) {
-      ruleDraft.value = createRuleDraft({ id: ruleId, project: activeProjectId.value })
+      ruleDraft.value = createRuleDraft({ id: ruleId, project: resolveRuleProject() })
       savedDraft.value = cloneDraft(ruleDraft.value)
       return
     }
@@ -155,7 +178,7 @@ export const useRulesStore = defineStore('rules', () => {
       ...source,
       id: newDraftId('copy'),
       name: `${source.name} 副本`,
-      project: activeProjectId.value,
+      project: resolveRuleProject(source.project),
       actions: source.actions.map(action => ({
         ...action,
         id: newActionId(),
@@ -178,7 +201,15 @@ export const useRulesStore = defineStore('rules', () => {
       throw new Error('matchExpr 不能为空')
     }
 
+    // Quick overrides always land in Default so saveRule won't rewrite project.
+    try {
+      await selectProject('default')
+    } catch {
+      // Still open the editor even if project switch fails.
+    }
+
     open.value = true
+    activePrimaryTab.value = 'rules'
     rulesPane.value = 'editor'
 
     const cachedId = quickOverrideDraftIds.get(matchExpr)
@@ -188,7 +219,7 @@ export const useRulesStore = defineStore('rules', () => {
     const nextDraft = createRuleDraft({
       id: draftId,
       name: `Override ${matchExpr}`,
-      project: activeProjectId.value,
+      project: 'default',
       description: `quick-override:host+path\nmatchExpr=${matchExpr}\nformat=${input.isJson ? 'json' : 'text'}`,
       enabled: true,
       matchDsl: matchExpr,
@@ -219,7 +250,7 @@ export const useRulesStore = defineStore('rules', () => {
   }
 
   function createRule() {
-    const draft = createRuleDraft({ project: activeProjectId.value })
+    const draft = createRuleDraft({ project: resolveRuleProject() })
     ruleDraft.value = draft
     savedDraft.value = cloneDraft(draft)
     selectedRuleId.value = draft.id
@@ -285,9 +316,10 @@ export const useRulesStore = defineStore('rules', () => {
     saving.value = true
     error.value = null
     try {
+      const project = resolveRuleProject(ruleDraft.value.project)
       const payload = draftToRequestRule(
-        { ...ruleDraft.value, project: activeProjectId.value },
-        activeProjectId.value,
+        { ...ruleDraft.value, project },
+        project,
       )
       const saved = await wsConnectionStore.call<RequestRuleDto>(
         WsOp.RulesSaveSet,
@@ -329,9 +361,10 @@ export const useRulesStore = defineStore('rules', () => {
         enabled,
       })
       lastRulesDtoById.set(ruleIdToString(updated.id), updated)
+      const listItem = requestRuleToListItem(updated, buildListItemOptions())
       rules.value = rules.value.map((rule: RuleWorkbenchRuleItem) => (
         rule.id === id
-          ? { ...requestRuleToListItem(updated), id }
+          ? { ...listItem, id }
           : rule
       ))
       if (selectedRuleId.value === id && ruleDraft.value) {
@@ -371,8 +404,11 @@ export const useRulesStore = defineStore('rules', () => {
       }
 
       // Update local state
-      rules.value = rules.value.map(rule => {
-        return ids.includes(rule.id) ? { ...rule, enabled } : rule
+      const options = buildListItemOptions()
+      rules.value = rules.value.map((rule) => {
+        if (!ids.includes(rule.id)) return rule
+        const dto = updated.find(item => ruleIdToString(item.id) === rule.id)
+        return dto ? { ...requestRuleToListItem(dto, options), id: rule.id } : { ...rule, enabled }
       })
 
       // Update draft if currently editing one of the selected rules
@@ -606,6 +642,25 @@ export const useRulesStore = defineStore('rules', () => {
     await refreshRules()
   }
 
+  async function toggleProjectEnabled(projectId: string, enabled: boolean) {
+    if (projectId === 'default' && !enabled) return
+
+    error.value = null
+    try {
+      const updated = await wsConnectionStore.call<RuleProjectDto>(WsOp.ProjectsEnabledSet, {
+        projectId,
+        enabled,
+      })
+      projects.value = projects.value.map(project => (
+        project.id === projectId ? { ...project, ...updated } : project
+      ))
+      rules.value = mapRulesToListItems([...lastRulesDtoById.values()])
+    } catch (err) {
+      error.value = String(err)
+      throw err
+    }
+  }
+
   return {
     open,
     activePrimaryTab,
@@ -634,6 +689,7 @@ export const useRulesStore = defineStore('rules', () => {
     moveRuleToProject,
     moveRulesToProject,
     deleteActiveProject,
+    toggleProjectEnabled,
     editRule,
     duplicateRule,
     openOrCreateQuickOverrideRule,
