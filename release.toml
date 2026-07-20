@@ -2,4 +2,3 @@ publish = false
 push = true
 pre-release-commit-message = "chore(release): {{version}}"
 pre-release-hook = ["task", "build-ui"]
-pre-tag-hook = ["bash", "-lc", "cargo run -q -p lynx-cli -- rules schema export --out schemas/rules-export.schema.json"]
