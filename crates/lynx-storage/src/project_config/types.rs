@@ -75,6 +75,8 @@ impl ConfigRule {
                 match_expr: self.capture.match_expr.clone(),
             },
             handlers: self.handlers.clone(),
+            created_at: None,
+            updated_at: None,
         }
     }
 }

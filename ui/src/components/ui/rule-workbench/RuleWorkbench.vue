@@ -11,6 +11,7 @@ import { getRuleValidationErrors } from './match-validation'
 import { createRuleDraft } from './types'
 import type { RuleDraft } from './types'
 import { getRuleSaveStatusLabel, isRuleSaveDisabled } from './save-status'
+import { sortRulesForDisplay } from '@/lib/ws/rules-mapper'
 
 export type RuleMobilePane = 'list' | 'editor'
 
@@ -24,6 +25,8 @@ export interface RuleWorkbenchRuleItem {
   forwardUrl?: string
   projectId?: string
   projectName?: string
+  createdAt?: number | null
+  updatedAt?: number | null
   state?: 'draft' | 'valid' | 'invalid'
 }
 
@@ -92,6 +95,8 @@ const filteredRules = computed(() => {
   ))
 })
 
+const displayedRules = computed(() => sortRulesForDisplay(filteredRules.value, 'updatedAt'))
+
 function isEffectivelyEnabled(rule: RuleWorkbenchRuleItem): boolean {
   return rule.effectiveEnabled ?? rule.enabled
 }
@@ -104,7 +109,7 @@ function ruleSwitchTitle(rule: RuleWorkbenchRuleItem): string | undefined {
 }
 
 const selectedRule = computed(() => {
-  return props.rules.find(rule => rule.id === selectedRuleIdLocal.value) ?? filteredRules.value[0]
+  return props.rules.find(rule => rule.id === selectedRuleIdLocal.value) ?? displayedRules.value[0]
 })
 
 const validationErrors = computed(() => getRuleValidationErrors(draftLocal.value))
@@ -251,10 +256,10 @@ function ruleStateClass(state?: RuleWorkbenchRuleItem['state']) {
         </div>
 
         <ul class="flex-1 space-y-1 overflow-auto p-2">
-          <li v-if="filteredRules.length === 0" class="rounded-sm border border-dashed border-border p-3 text-xs text-muted-foreground">
+          <li v-if="displayedRules.length === 0" class="rounded-sm border border-dashed border-border p-3 text-xs text-muted-foreground">
             没有匹配当前筛选条件的规则。
           </li>
-          <li v-for="rule in filteredRules" :key="rule.id">
+          <li v-for="rule in displayedRules" :key="rule.id">
             <div
               class="flex items-start gap-2 rounded-md px-2.5 py-2 transition-colors"
               :class="[

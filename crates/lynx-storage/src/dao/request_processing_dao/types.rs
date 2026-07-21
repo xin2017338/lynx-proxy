@@ -29,6 +29,10 @@ pub struct RequestRule {
     pub priority: i32,
     pub capture: CaptureRule,
     pub handlers: Vec<HandlerRule>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub created_at: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<i64>,
 }
 
 /// Modify request handler configuration
@@ -61,6 +65,8 @@ impl Default for RequestRule {
             priority: 0,
             capture: CaptureRule::default(),
             handlers: vec![],
+            created_at: None,
+            updated_at: None,
         }
     }
 }

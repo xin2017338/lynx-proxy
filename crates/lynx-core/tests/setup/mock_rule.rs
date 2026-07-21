@@ -21,6 +21,8 @@ pub async fn create_test_rule(
         priority: 1,
         capture: create_basic_capture_rule(),
         handlers: vec![],
+        created_at: None,
+        updated_at: None,
     };
 
     dao.create_rule(rule).await
@@ -50,6 +52,8 @@ pub async fn mock_test_rule(store: Arc<DataStore>, handlers: Vec<HandlerRule>) -
             match_expr: "/".to_string(),
         },
         handlers,
+        created_at: None,
+        updated_at: None,
     };
     dao.create_rule(rule).await
 }

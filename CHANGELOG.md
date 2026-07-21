@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.10] - 2026-07-21
+
+### 🚀 Features
+
+- *(rules)* Add `createdAt` / `updatedAt` timestamps to request rules; server stamps on create, update, and toggle
+- *(rules)* Rule list default sort by updated time; also supports created time, priority, and forward URL
+- *(rules)* Restore drag-to-project when in-list reorder is disabled (Default overview, search, non-priority sort)
+
+### 🐛 Bug Fixes
+
+- *(rules)* Fix cross-project rule drag being blocked together with list reorder
+
+### 📝 Notes
+
+- *(rules)* **Default 全览** lists rules from all projects. **Priority drag-reorder is intentionally disabled** in this view because priority is per-project, not global. To adjust priority, open a specific project and use priority sort; dragging rules to the left sidebar to change project still works.
+
 ## [0.8.9] - 2026-07-20
 
 ### 🚀 Features

@@ -48,7 +48,7 @@ const emit = defineEmits<{
 }>()
 
 const searchTerm = ref('')
-const sortMode = ref<RuleListSortMode>('priority')
+const sortMode = ref<RuleListSortMode>('updatedAt')
 const localRules = ref<RuleWorkbenchRuleItem[]>([])
 const listRootRef = ref<HTMLElement | null>(null)
 
@@ -102,12 +102,14 @@ watch(displayedRules, (next) => {
   pruneSelection(next.map(rule => rule.id))
 }, { immediate: true })
 
-const dragDisabled = computed(() => (
+const reorderDisabled = computed(() => (
   props.reordering
   || searchTerm.value.trim().length > 0
-  || sortMode.value === 'forwardUrl'
+  || sortMode.value !== 'priority'
   || props.showAllProjects
 ))
+
+const dragHandleDisabled = computed(() => props.reordering)
 
 function toggleSelectAllVisible() {
   const ids = visibleRuleIds.value
@@ -146,7 +148,7 @@ function prepareDragSelection(draggedId: string, rootEl: HTMLElement | null | un
 }
 
 function onSortableChoose(evt: SortableItemEvent) {
-  if (dragDisabled.value) return
+  if (dragHandleDisabled.value) return
   const draggedId = evt.item?.dataset.ruleId
   if (!draggedId) return
   prepareDragSelection(draggedId, evt.item?.parentElement ?? evt.from)
@@ -154,7 +156,7 @@ function onSortableChoose(evt: SortableItemEvent) {
 }
 
 function onSortableStart(evt: SortableItemEvent) {
-  if (dragDisabled.value) return
+  if (dragHandleDisabled.value) return
   const index = evt.oldIndex
   if (index == null || index < 0) return
   const rule = localRules.value[index]
@@ -169,7 +171,7 @@ function onDragEnd() {
   if (listRootRef.value) {
     clearSortableMultiSelect(listRootRef.value)
   }
-  if (dragDisabled.value || skipReorder) {
+  if (reorderDisabled.value || skipReorder) {
     if (skipReorder) {
       clearSelection()
     }
@@ -180,7 +182,7 @@ function onDragEnd() {
 }
 
 function setDragData(dataTransfer: DataTransfer, dragEl: HTMLElement) {
-  if (dragDisabled.value) return
+  if (dragHandleDisabled.value) return
   const draggedId = dragEl.dataset.ruleId
   if (!draggedId) return
   const ids = idsForDrag(draggedId, orderedRuleIds.value)
@@ -199,11 +201,11 @@ function onListBackgroundClick() {
 }
 
 function dragHandleTitle(ruleId: string) {
-  if (dragDisabled.value && props.showAllProjects) {
-    return '全览模式下不可拖拽排序'
+  if (dragHandleDisabled.value) {
+    return '正在保存排序，请稍候'
   }
-  if (dragDisabled.value && sortMode.value === 'forwardUrl') {
-    return '按转发 URL 排序时不可拖拽'
+  if (reorderDisabled.value) {
+    return '不可拖拽排序，可拖到左侧项目移动归属'
   }
   const count = selectedCount.value
   if (count > 1 && isSelected(ruleId)) {
@@ -271,8 +273,22 @@ function startsForwardUrlGroup(index: number): boolean {
       </Button>
     </div>
 
-    <div class="flex items-center gap-2 px-2 pb-2">
+    <div class="flex flex-wrap items-center gap-2 px-2 pb-2">
       <ArrowDownUp class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+      <button
+        type="button"
+        :class="drawerFilterChipClass(sortMode === 'updatedAt')"
+        @click="sortMode = 'updatedAt'"
+      >
+        更新时间
+      </button>
+      <button
+        type="button"
+        :class="drawerFilterChipClass(sortMode === 'createdAt')"
+        @click="sortMode = 'createdAt'"
+      >
+        创建时间
+      </button>
       <button
         type="button"
         :class="drawerFilterChipClass(sortMode === 'priority')"
@@ -337,7 +353,8 @@ function startsForwardUrlGroup(index: number): boolean {
         item-key="id"
         tag="ul"
         class="space-y-2"
-        :disabled="dragDisabled"
+        :disabled="dragHandleDisabled"
+        :sort="!reorderDisabled"
         handle=".drag-handle"
         :multi-drag="true"
         selected-class="sortable-selected"
@@ -371,8 +388,8 @@ function startsForwardUrlGroup(index: number): boolean {
                 <button
                   type="button"
                   class="drag-handle mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
-                  :class="dragDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-grab active:cursor-grabbing'"
-                  :disabled="dragDisabled"
+                  :class="dragHandleDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-grab active:cursor-grabbing'"
+                  :disabled="dragHandleDisabled"
                   :aria-label="`拖拽排序或移动 ${rule.name}`"
                   :title="dragHandleTitle(rule.id)"
                   @click.stop

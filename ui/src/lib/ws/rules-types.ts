@@ -29,6 +29,8 @@ export interface RequestRuleDto {
   priority: number
   capture: CaptureRuleDto
   handlers: HandlerRuleDto[]
+  createdAt?: number | null
+  updatedAt?: number | null
 }
 
 export interface RulesListResponse {

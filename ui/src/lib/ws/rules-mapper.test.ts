@@ -207,6 +207,39 @@ describe('rules-mapper', () => {
     expect(item.effectiveEnabled).toBe(false)
   })
 
+  it('passes through createdAt and updatedAt', () => {
+    const item = requestRuleToListItem({
+      ...sampleRule,
+      createdAt: 1000,
+      updatedAt: 2000,
+    })
+
+    expect(item.createdAt).toBe(1000)
+    expect(item.updatedAt).toBe(2000)
+  })
+
+  it('sorts rules by updatedAt descending with missing timestamps last', () => {
+    const sorted = sortRulesForDisplay([
+      { id: '1', name: 'A', enabled: true, priority: 10, updatedAt: 1000 },
+      { id: '2', name: 'B', enabled: true, priority: 20, updatedAt: 3000 },
+      { id: '3', name: 'C', enabled: true, priority: 30 },
+      { id: '4', name: 'D', enabled: true, priority: 40, updatedAt: 2000 },
+    ], 'updatedAt')
+
+    expect(sorted.map(rule => rule.id)).toEqual(['2', '4', '1', '3'])
+  })
+
+  it('sorts rules by createdAt descending with missing timestamps last', () => {
+    const sorted = sortRulesForDisplay([
+      { id: '1', name: 'A', enabled: true, priority: 10, createdAt: 5000 },
+      { id: '2', name: 'B', enabled: true, priority: 20 },
+      { id: '3', name: 'C', enabled: true, priority: 30, createdAt: 9000 },
+      { id: '4', name: 'D', enabled: true, priority: 40, createdAt: 7000 },
+    ], 'createdAt')
+
+    expect(sorted.map(rule => rule.id)).toEqual(['3', '4', '1', '2'])
+  })
+
   it('sorts rules by forward url with empty urls last', () => {
     const sorted = sortRulesForDisplay([
       { id: '1', name: 'A', enabled: true, priority: 10, forwardUrl: 'https://b.example.com' },

@@ -327,6 +327,8 @@ mod tests {
                 match_expr: "/".to_string(),
             },
             handlers: vec![],
+            created_at: None,
+            updated_at: None,
         };
         write_json_atomic(&rule_path, &rule).await?;
 

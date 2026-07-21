@@ -55,6 +55,8 @@ export function requestRuleToListItem(
     forwardUrl,
     projectId,
     projectName: options?.projectNameMap?.get(projectId),
+    createdAt: rule.createdAt ?? null,
+    updatedAt: rule.updatedAt ?? null,
     state: errors.length > 0 ? 'invalid' : 'valid',
   }
 }
@@ -333,7 +335,26 @@ export function cloneDraft(draft: RuleDraft): RuleDraft {
   return JSON.parse(JSON.stringify(draft)) as RuleDraft
 }
 
-export type RuleListSortMode = 'priority' | 'forwardUrl'
+export type RuleListSortMode = 'updatedAt' | 'createdAt' | 'priority' | 'forwardUrl'
+
+function compareTimestampDesc(
+  left?: number | null,
+  right?: number | null,
+): number {
+  const leftValue = left ?? null
+  const rightValue = right ?? null
+  if (leftValue == null && rightValue == null) return 0
+  if (leftValue == null) return 1
+  if (rightValue == null) return -1
+  return rightValue - leftValue
+}
+
+function secondaryRuleSort(
+  left: RuleWorkbenchRuleItem,
+  right: RuleWorkbenchRuleItem,
+): number {
+  return right.priority - left.priority || left.name.localeCompare(right.name)
+}
 
 export function sortRulesForDisplay(
   rules: RuleWorkbenchRuleItem[],
@@ -344,15 +365,27 @@ export function sortRulesForDisplay(
   }
 
   return [...rules].sort((left, right) => {
+    if (sortMode === 'updatedAt') {
+      const timestampCompare = compareTimestampDesc(left.updatedAt, right.updatedAt)
+      if (timestampCompare !== 0) return timestampCompare
+      return secondaryRuleSort(left, right)
+    }
+
+    if (sortMode === 'createdAt') {
+      const timestampCompare = compareTimestampDesc(left.createdAt, right.createdAt)
+      if (timestampCompare !== 0) return timestampCompare
+      return secondaryRuleSort(left, right)
+    }
+
     const leftUrl = left.forwardUrl
     const rightUrl = right.forwardUrl
     if (!leftUrl && !rightUrl) {
-      return right.priority - left.priority || left.name.localeCompare(right.name)
+      return secondaryRuleSort(left, right)
     }
     if (!leftUrl) return 1
     if (!rightUrl) return -1
     const urlCompare = leftUrl.localeCompare(rightUrl)
     if (urlCompare !== 0) return urlCompare
-    return right.priority - left.priority || left.name.localeCompare(right.name)
+    return secondaryRuleSort(left, right)
   })
 }
