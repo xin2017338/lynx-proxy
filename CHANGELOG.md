@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.11] - 2026-09-04
+
+### 🐛 Bug Fixes
+
+- *(proxy)* Stabilize WebSocket relay by stripping permessage-deflate extension during upstream handshake and avoiding downstream extension echo that could trigger reconnect loops
+
 ## [0.8.10] - 2026-07-21
 
 ### 🚀 Features

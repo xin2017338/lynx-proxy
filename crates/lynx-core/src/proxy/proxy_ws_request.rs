@@ -5,7 +5,10 @@ use axum::response::{IntoResponse, Response};
 use futures_util::{Sink, SinkExt, Stream, StreamExt};
 use http::{
     Request, Uri,
-    header::{HOST, HeaderValue, PROXY_AUTHORIZATION, SEC_WEBSOCKET_KEY, SEC_WEBSOCKET_PROTOCOL},
+    header::{
+        HOST, HeaderValue, PROXY_AUTHORIZATION, SEC_WEBSOCKET_EXTENSIONS, SEC_WEBSOCKET_KEY,
+        SEC_WEBSOCKET_PROTOCOL,
+    },
     request::Parts,
 };
 use http_body_util::BodyExt;
@@ -73,6 +76,8 @@ fn normalize_websocket_uri(uri: Uri) -> Result<Uri> {
 fn align_upstream_handshake_headers(parts: &mut Parts, uri: &Uri) -> Result<()> {
     parts.headers.remove(PROXY_AUTHORIZATION);
     parts.headers.remove(HOST);
+    // Prevent permessage-deflate negotiation mismatch between proxy legs.
+    parts.headers.remove(SEC_WEBSOCKET_EXTENSIONS);
 
     if let Some(authority) = uri.authority() {
         parts.headers.insert(
@@ -115,6 +120,15 @@ impl IntoClientRequest for WebSocketReq {
 
 pub fn is_websocket_req(req: &Req) -> bool {
     hyper_tungstenite::is_upgrade_request(req)
+}
+
+fn copy_upstream_handshake_headers(
+    downstream_headers: &mut http::HeaderMap,
+    upstream_headers: &http::HeaderMap,
+) {
+    if let Some(header_value) = upstream_headers.get(SEC_WEBSOCKET_PROTOCOL) {
+        downstream_headers.insert(SEC_WEBSOCKET_PROTOCOL, header_value.clone());
+    }
 }
 
 async fn proxy_ws_inner(mut req: Req) -> Result<Response> {
@@ -160,11 +174,7 @@ async fn proxy_ws_inner(mut req: Req) -> Result<Response> {
     });
 
     let (mut parts, body) = client_res.into_parts();
-    if let Some(protocol) = upstream_res.headers().get(SEC_WEBSOCKET_PROTOCOL) {
-        parts
-            .headers
-            .insert(SEC_WEBSOCKET_PROTOCOL, protocol.clone());
-    }
+    copy_upstream_handshake_headers(&mut parts.headers, upstream_res.headers());
     let bytes = body.collect().await?.to_bytes();
     let client_res = Response::from_parts(parts, full(bytes));
     Ok(client_res.into_response())
@@ -349,10 +359,7 @@ mod tests {
             parts.headers.get(ORIGIN).unwrap(),
             "https://virtual.example.com"
         );
-        assert_eq!(
-            parts.headers.get(SEC_WEBSOCKET_EXTENSIONS).unwrap(),
-            "permessage-deflate"
-        );
+        assert!(parts.headers.get(SEC_WEBSOCKET_EXTENSIONS).is_none());
     }
 
     #[test]
@@ -400,5 +407,27 @@ mod tests {
             "webpack-hmr"
         );
         assert_eq!(parts.headers.get(ORIGIN).unwrap(), "https://not_exist.com");
+    }
+
+    #[test]
+    fn copy_upstream_handshake_headers_only_includes_subprotocol() {
+        let mut downstream_headers = http::HeaderMap::new();
+        let mut upstream_headers = http::HeaderMap::new();
+        upstream_headers.insert(
+            SEC_WEBSOCKET_PROTOCOL,
+            HeaderValue::from_static("graphql-transport-ws"),
+        );
+        upstream_headers.insert(
+            SEC_WEBSOCKET_EXTENSIONS,
+            HeaderValue::from_static("permessage-deflate"),
+        );
+
+        copy_upstream_handshake_headers(&mut downstream_headers, &upstream_headers);
+
+        assert_eq!(
+            downstream_headers.get(SEC_WEBSOCKET_PROTOCOL).unwrap(),
+            "graphql-transport-ws"
+        );
+        assert!(downstream_headers.get(SEC_WEBSOCKET_EXTENSIONS).is_none());
     }
 }
