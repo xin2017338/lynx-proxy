@@ -58,6 +58,7 @@ async function loadAll() {
   if (props.preview) {
     general.value = {
       ...props.preview.general,
+      maxResponseSizeMb: props.preview.general.maxResponseSizeMb ?? 50,
       hideConnectTunnels: props.preview.general.hideConnectTunnels !== false,
     }
     capture.value = structuredClone(props.preview.capture)
@@ -81,6 +82,7 @@ async function loadAll() {
     const hideConnect = generalData.hideConnectTunnels !== false
     general.value = {
       ...generalData,
+      maxResponseSizeMb: generalData.maxResponseSizeMb ?? 50,
       hideConnectTunnels: hideConnect,
     }
     generalSettingsStore.applyMaxLogSize(generalData.maxLogSize)
@@ -109,6 +111,11 @@ async function saveAll() {
       || general.value.maxLogSize > MAX_LOG_SIZE_MAX
     ) {
       saveMessage.value = `日志大小需在 ${MAX_LOG_SIZE_MIN}–${MAX_LOG_SIZE_MAX} 之间`
+      return
+    }
+
+    if (!Number.isInteger(general.value.maxResponseSizeMb) || general.value.maxResponseSizeMb! < 1 || general.value.maxResponseSizeMb! > 1024) {
+      saveMessage.value = '最大响应大小需为 1–1024 MB 的整数'
       return
     }
 
@@ -246,6 +253,15 @@ onMounted(() => {
             />
           </div>
         </div>
+      </section>
+
+      <section id="api-studio-settings" class="space-y-1">
+        <h2 :class="settingsSectionTitleClass">API Studio</h2>
+        <div :class="settingsRowGridClass">
+          <label for="max-response-size" :class="settingsLabelClass">最大响应大小（MB）</label>
+          <input id="max-response-size" v-model.number="general.maxResponseSizeMb" type="number" min="1" max="1024" step="1" :class="cn(settingsMonoFieldClass, 'w-20')">
+        </div>
+        <p :class="[settingsValueIndentClass, 'text-[11px] text-muted-foreground']">默认 50 MB，对后续请求生效。超过上限停止接收正文；大文本仅展示部分内容。</p>
       </section>
 
       <section class="space-y-1">

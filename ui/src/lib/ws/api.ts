@@ -127,7 +127,7 @@ export const createWsApi = (client: WsClient): WsApi => {
         payload,
       ),
     sendComposeRequest: (payload) =>
-      client.call<ComposeResponse, ComposeRequestPayload>(WsOp.ComposeRequestSend, payload),
+      client.call<ComposeResponse, ComposeRequestPayload>(WsOp.ComposeRequestSend, payload, ((payload.timeout || 30) + 10) * 1000),
     subscribeRequestStream: () => client.call(WsOp.RequestStreamSubscribe),
     unsubscribeRequestStream: () => client.call(WsOp.RequestStreamUnsubscribe),
     getGeneralSetting: () => client.call<GeneralSetting>(WsOp.SettingsGeneralGet),

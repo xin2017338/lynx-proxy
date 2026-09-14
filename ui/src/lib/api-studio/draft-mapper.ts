@@ -43,10 +43,9 @@ export function serverDraftToApiDraft(
 }
 
 export function apiDraftToComposePayload(draft: ApiRequestDraft) {
-  const timeoutSecs = draft.timeout
-    ?? (draft.settings?.timeoutMs
+  const timeoutSecs = (draft.settings?.timeoutMs
       ? Math.max(1, Math.ceil(draft.settings.timeoutMs / 1000))
-      : 30)
+      : draft.timeout ?? 30)
 
   return {
     method: draft.method,

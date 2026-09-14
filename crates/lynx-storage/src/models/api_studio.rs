@@ -109,9 +109,26 @@ pub struct HistoryDraftSnapshot {
     pub timeout: Option<u64>,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResponseBodyInfo {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub body_encoding: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub body_state: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub body_message: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size_known: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit_bytes: Option<usize>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HistoryResponseSnapshot {
+    #[serde(flatten)]
+    pub body_info: ResponseBodyInfo,
     #[serde(default)]
     pub status: u16,
     #[serde(default)]

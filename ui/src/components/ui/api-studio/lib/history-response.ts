@@ -20,6 +20,11 @@ export function normalizeComposeResponse(
     responseTime: response.responseTime ?? 0,
     size: response.size ?? body.length,
     errorMessage: response.errorMessage,
+    bodyEncoding: response.bodyEncoding,
+    bodyState: response.bodyState,
+    bodyMessage: response.bodyMessage,
+    sizeKnown: response.sizeKnown,
+    limitBytes: response.limitBytes,
   }
 }
 
@@ -118,13 +123,8 @@ export function snapshotResponseForHistory(
 ): ComposeResponse | undefined {
   const normalized = normalizeComposeResponse(response)
   if (!normalized) return undefined
-  return {
-    status: normalized.status,
-    statusText: normalized.statusText,
-    headers: { ...normalized.headers },
-    body: normalized.body,
-    responseTime: normalized.responseTime,
-    size: normalized.size,
-    errorMessage: normalized.errorMessage,
+  if (normalized.body.length > 256 * 1024) {
+    return { ...normalized, body: '', bodyEncoding: undefined, bodyState: 'omitted', bodyMessage: '此历史记录未保存较大的响应正文，请重新发送请求查看。' }
   }
+  return normalized
 }

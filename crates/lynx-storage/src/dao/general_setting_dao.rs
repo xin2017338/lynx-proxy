@@ -3,6 +3,10 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+pub fn default_max_response_size_mb() -> u32 {
+    50
+}
+
 fn default_true() -> bool {
     true
 }
@@ -11,6 +15,8 @@ fn default_true() -> bool {
 #[serde(rename_all = "camelCase")]
 pub struct GeneralSetting {
     pub max_log_size: i32,
+    #[serde(default = "default_max_response_size_mb")]
+    pub max_response_size_mb: u32,
     #[serde(default)]
     pub language: String,
     #[serde(default = "default_true")]
@@ -21,6 +27,7 @@ impl Default for GeneralSetting {
     fn default() -> Self {
         Self {
             max_log_size: 5000,
+            max_response_size_mb: default_max_response_size_mb(),
             language: "zh-CN".to_string(),
             hide_connect_tunnels: true,
         }
@@ -45,6 +52,20 @@ impl GeneralSettingDao {
     }
 
     pub async fn update_general_setting(&self, setting: GeneralSetting) -> Result<()> {
+        anyhow::ensure!(
+            (1..=1024).contains(&setting.max_response_size_mb),
+            "最大响应大小需在 1–1024 MB 之间"
+        );
         write_json_atomic(&self.path(), &setting).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn legacy_settings_default_to_50_mb() {
+        let setting: GeneralSetting = serde_json::from_str(r#"{"maxLogSize":5000}"#).unwrap();
+        assert_eq!(setting.max_response_size_mb, 50);
     }
 }

@@ -179,7 +179,7 @@ export const useApiStudioStore = defineStore('apiStudio', () => {
     if (!draft.url?.trim()) return null
 
     const payload = apiDraftToComposePayload(draft)
-    const raw = await ws.call<ComposeResponse>(WsOp.ComposeRequestSend, payload)
+    const raw = await ws.call<ComposeResponse>(WsOp.ComposeRequestSend, payload, (payload.timeout + 10) * 1000)
     return normalizeComposeResponse(raw)
   }
 

@@ -66,6 +66,7 @@ async fn ws_settings_general_get() -> Result<()> {
     assert_eq!(frame["kind"], "response");
     assert_eq!(frame["op"], "settings.general.get");
     assert!(frame["payload"]["maxLogSize"].is_number());
+    assert_eq!(frame["payload"]["maxResponseSizeMb"], 50);
 
     Ok(())
 }

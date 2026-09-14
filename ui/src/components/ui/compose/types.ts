@@ -40,6 +40,11 @@ export interface ComposeResponse {
   body: string
   responseTime: number
   size: number
+  bodyEncoding?: 'base64'
+  bodyState?: 'blocked' | 'failed' | 'omitted'
+  bodyMessage?: string
+  sizeKnown?: boolean
+  limitBytes?: number
   errorMessage?: string
 }
 

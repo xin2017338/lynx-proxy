@@ -76,7 +76,19 @@ impl HistoryStore {
         Ok(all)
     }
 
-    pub async fn append(&self, req: CreateHistoryEntry) -> Result<HistoryEntry, ApiStudioError> {
+    pub async fn append(
+        &self,
+        mut req: CreateHistoryEntry,
+    ) -> Result<HistoryEntry, ApiStudioError> {
+        if let Some(response) = req.response.as_mut()
+            && response.body.len() > 256 * 1024
+        {
+            response.body.clear();
+            response.body_info.body_encoding = None;
+            response.body_info.body_state = Some("omitted".into());
+            response.body_info.body_message =
+                Some("此历史记录未保存较大的响应正文，请重新发送请求查看。".into());
+        }
         let id = new_id();
         let sent_at = req
             .sent_at
@@ -206,6 +218,7 @@ mod tests {
                     timeout: Some(30),
                 },
                 response: Some(HistoryResponseSnapshot {
+                    body_info: Default::default(),
                     status: 200,
                     status_text: "OK".into(),
                     headers: Default::default(),
@@ -229,5 +242,52 @@ mod tests {
         assert_eq!(list[0].draft.body, r#"{"hello":"world"}"#);
         let response = list[0].response.as_ref().expect("response snapshot");
         assert_eq!(response.body, r#"{"ok":true}"#);
+    }
+
+    #[tokio::test]
+    async fn large_response_body_is_not_persisted() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = DataStore::new(dir.path()).await.unwrap();
+        let studio = ApiStudioStore::new(store);
+
+        let entry = studio
+            .append_history(CreateHistoryEntry {
+                sent_at: Some(1_700_000_000_000),
+                method: HttpMethod::Get,
+                url: "https://example.com/large".into(),
+                status: Some(200),
+                status_text: Some("OK".into()),
+                duration_ms: Some(42),
+                draft: HistoryDraftSnapshot {
+                    name: "Large response".into(),
+                    method: HttpMethod::Get,
+                    url: "https://example.com/large".into(),
+                    query_params: vec![],
+                    headers: vec![],
+                    body: String::new(),
+                    cookies: vec![],
+                    settings: RequestSettings::default(),
+                    timeout: Some(30),
+                },
+                response: Some(HistoryResponseSnapshot {
+                    body_info: Default::default(),
+                    status: 200,
+                    status_text: "OK".into(),
+                    headers: Default::default(),
+                    body: "a".repeat(256 * 1024 + 1),
+                    response_time: 42,
+                    size: 256 * 1024 + 1,
+                    error_message: None,
+                }),
+                request_node_id: None,
+                tab_id: None,
+            })
+            .await
+            .unwrap();
+
+        let response = entry.response.expect("response snapshot");
+        assert!(response.body.is_empty());
+        assert_eq!(response.body_info.body_state.as_deref(), Some("omitted"));
+        assert!(response.body_info.body_message.is_some());
     }
 }

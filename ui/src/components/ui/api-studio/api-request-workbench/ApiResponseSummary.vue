@@ -33,7 +33,7 @@ const responseSummary = computed(() => {
     status,
     statusText,
     responseTime,
-    sizeLabel: bytes(size),
+    sizeLabel: `${props.response.sizeKnown === false ? '≥ ' : ''}${bytes(size)}`,
   }
 })
 </script>

@@ -84,8 +84,9 @@ export const useWsConnectionStore = defineStore('wsConnection', () => {
   const call = async <TResponse = unknown, TPayload = Record<string, unknown>>(
     op: string,
     payload?: TPayload,
+    timeoutMs?: number,
   ) => {
-    return ensureClient().call<TResponse, TPayload>(op, payload)
+    return ensureClient().call<TResponse, TPayload>(op, payload, timeoutMs)
   }
 
   const onEvent = (

@@ -137,7 +137,13 @@ export function readApiStudioTabSession(): ApiStudioTabSession | null {
 
 export function writeApiStudioTabSession(session: ApiStudioTabSession): void {
   if (typeof window === 'undefined') return
-  window.localStorage.setItem(API_STUDIO_TAB_SESSION_KEY, JSON.stringify(session))
+  const compact = { ...session, tabs: session.tabs.map(tab => tab.kind === 'request' && tab.lastResponse && tab.lastResponse.body.length > 16 * 1024
+    ? { ...tab, lastResponse: { ...tab.lastResponse, body: '', bodyEncoding: undefined, bodyState: 'omitted', bodyMessage: '标签缓存未保存较大的正文，请从历史记录恢复或重新发送请求。' } }
+    : tab) }
+  try { window.localStorage.setItem(API_STUDIO_TAB_SESSION_KEY, JSON.stringify(compact)) }
+  catch {
+    // Quota exhaustion must not interrupt an active request or destroy the previous session.
+  }
 }
 
 export function clearApiStudioTabSession(): void {
