@@ -1,61 +1,10 @@
 use std::net::SocketAddr;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use anyhow::{Result, anyhow};
-use serde::{Deserialize, Serialize};
-use tokio::fs;
 
 use super::executor::{adb_output_message, ensure_success, run_adb};
-use super::types::{EnableProxyPayload, ProxyMode, ProxyState};
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct PersistedProxyStateFile {
-    serial: String,
-    backup_http_proxy: String,
-    mode: ProxyMode,
-    port: u16,
-}
-
-fn proxy_state_dir(data_root: &Path) -> PathBuf {
-    data_root.join("adb").join("proxy-state")
-}
-
-fn proxy_state_path(data_root: &Path, serial: &str) -> PathBuf {
-    let safe: String = serial
-        .chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
-                c
-            } else {
-                '_'
-            }
-        })
-        .collect();
-    proxy_state_dir(data_root).join(format!("{safe}.json"))
-}
-
-async fn load_persisted(data_root: &Path, serial: &str) -> Option<PersistedProxyStateFile> {
-    let path = proxy_state_path(data_root, serial);
-    let text = fs::read_to_string(path).await.ok()?;
-    serde_json::from_str(&text).ok()
-}
-
-async fn save_persisted(data_root: &Path, state: &PersistedProxyStateFile) -> Result<()> {
-    let dir = proxy_state_dir(data_root);
-    fs::create_dir_all(&dir).await?;
-    let path = proxy_state_path(data_root, &state.serial);
-    let json = serde_json::to_string_pretty(state)?;
-    fs::write(path, json).await?;
-    Ok(())
-}
-
-async fn remove_persisted(data_root: &Path, serial: &str) -> Result<()> {
-    let path = proxy_state_path(data_root, serial);
-    if path.exists() {
-        fs::remove_file(path).await?;
-    }
-    Ok(())
-}
+use super::types::{EnableProxyPayload, ProxyState};
 
 pub async fn get_http_proxy(adb_path: &Path, serial: &str) -> Result<Option<String>> {
     let output = run_adb(
@@ -84,35 +33,6 @@ pub async fn set_http_proxy(adb_path: &Path, serial: &str, value: &str) -> Resul
     Ok(())
 }
 
-pub async fn setup_reverse(adb_path: &Path, serial: &str, port: u16) -> Result<()> {
-    let spec = format!("tcp:{port}");
-    let output = run_adb(adb_path, Some(serial), &["reverse", &spec, &spec]).await?;
-    ensure_success(&output, "adb reverse")?;
-    Ok(())
-}
-
-pub async fn remove_reverse(adb_path: &Path, serial: &str, port: u16) -> Result<()> {
-    let spec = format!("tcp:{port}");
-    let output = run_adb(adb_path, Some(serial), &["reverse", "--remove", &spec]).await?;
-    if !output.status.success() {
-        tracing::debug!(
-            "adb reverse --remove ignored: {}",
-            adb_output_message(&output)
-        );
-    }
-    Ok(())
-}
-
-pub async fn list_reverse(adb_path: &Path, serial: &str, port: u16) -> bool {
-    let output = run_adb(adb_path, Some(serial), &["reverse", "--list"]).await;
-    let Ok(output) = output else {
-        return false;
-    };
-    let text = adb_output_message(&output);
-    let needle = format!("tcp:{port}");
-    text.contains(&needle)
-}
-
 pub fn pick_lan_host(access_addrs: &[SocketAddr], override_host: Option<&str>) -> Result<String> {
     if let Some(host) = override_host {
         let host = host.trim();
@@ -129,7 +49,7 @@ pub fn pick_lan_host(access_addrs: &[SocketAddr], override_host: Option<&str>) -
         return Ok(ip.to_string());
     }
     Err(anyhow!(
-        "no LAN address available; use USB reverse mode or restart without --local-only"
+        "no LAN address available; restart Lynx without --local-only"
     ))
 }
 
@@ -142,35 +62,24 @@ fn strip_port_from_host(host: &str) -> String {
     host.split(':').next().unwrap_or(host).to_string()
 }
 
-pub fn proxy_host_port(mode: ProxyMode, host: &str, port: u16) -> String {
-    match mode {
-        ProxyMode::Lan => format!("{host}:{port}"),
-        ProxyMode::UsbReverse => format!("127.0.0.1:{port}"),
-    }
+pub fn proxy_host_port(host: &str, port: u16) -> String {
+    format!("{host}:{port}")
+}
+
+fn is_proxy_enabled(current_http_proxy: Option<&str>) -> bool {
+    matches!(current_http_proxy, Some(v) if v.trim() != ":0")
 }
 
 pub async fn get_proxy_state(
     adb_path: &Path,
-    data_root: &Path,
+    _data_root: &Path,
     serial: &str,
 ) -> Result<ProxyState> {
     let current = get_http_proxy(adb_path, serial).await?;
-    let persisted = load_persisted(data_root, serial).await;
-    let port = persisted.as_ref().map(|p| p.port).unwrap_or(7788);
-    let reverse_active = list_reverse(adb_path, serial, port).await;
     Ok(ProxyState {
         serial: serial.to_string(),
+        lynx_managed: is_proxy_enabled(current.as_deref()),
         current_http_proxy: current,
-        lynx_managed: persisted.is_some(),
-        mode: persisted.as_ref().map(|p| p.mode),
-        reverse_active,
-        backup_http_proxy: persisted.as_ref().and_then(|p| {
-            if p.backup_http_proxy == "null" {
-                None
-            } else {
-                Some(p.backup_http_proxy.clone())
-            }
-        }),
     })
 }
 
@@ -181,9 +90,9 @@ pub async fn enable_proxy(
     local_only: bool,
     payload: EnableProxyPayload,
 ) -> Result<ProxyState> {
-    if payload.mode == ProxyMode::Lan && local_only {
+    if local_only {
         return Err(anyhow!(
-            "LAN proxy mode is unavailable while Lynx runs with --local-only; use USB reverse mode"
+            "proxy enable is unavailable while Lynx runs with --local-only"
         ));
     }
 
@@ -191,57 +100,15 @@ pub async fn enable_proxy(
         .port
         .unwrap_or_else(|| access_addrs.first().map(|a| a.port()).unwrap_or(7788));
 
-    if load_persisted(data_root, &payload.serial).await.is_some() {
-        return Err(anyhow!(
-            "proxy already enabled for this device; disable first"
-        ));
-    }
-
-    let backup = get_http_proxy(adb_path, &payload.serial).await?;
-    let backup_str = backup.as_deref().unwrap_or("null").to_string();
-
-    let host = match payload.mode {
-        ProxyMode::Lan => pick_lan_host(access_addrs, payload.host.as_deref())?,
-        ProxyMode::UsbReverse => {
-            setup_reverse(adb_path, &payload.serial, port).await?;
-            "127.0.0.1".to_string()
-        }
-    };
-
-    let proxy_value = proxy_host_port(payload.mode, &host, port);
+    let host = pick_lan_host(access_addrs, Some(payload.host.as_str()))?;
+    let proxy_value = proxy_host_port(&host, port);
     set_http_proxy(adb_path, &payload.serial, &proxy_value).await?;
-
-    save_persisted(
-        data_root,
-        &PersistedProxyStateFile {
-            serial: payload.serial.clone(),
-            backup_http_proxy: backup_str,
-            mode: payload.mode,
-            port,
-        },
-    )
-    .await?;
 
     get_proxy_state(adb_path, data_root, &payload.serial).await
 }
 
 pub async fn disable_proxy(adb_path: &Path, data_root: &Path, serial: &str) -> Result<ProxyState> {
-    let persisted = load_persisted(data_root, serial).await;
-    let Some(persisted) = persisted else {
-        set_http_proxy(adb_path, serial, ":0").await.ok();
-        return get_proxy_state(adb_path, data_root, serial).await;
-    };
-
-    let restore = if persisted.backup_http_proxy == "null" {
-        ":0"
-    } else {
-        persisted.backup_http_proxy.as_str()
-    };
-    set_http_proxy(adb_path, serial, restore).await?;
-    if persisted.mode == ProxyMode::UsbReverse {
-        remove_reverse(adb_path, serial, persisted.port).await?;
-    }
-    remove_persisted(data_root, serial).await?;
+    set_http_proxy(adb_path, serial, ":0").await?;
     get_proxy_state(adb_path, data_root, serial).await
 }
 
@@ -255,10 +122,10 @@ mod tests {
     fn pick_lan_host_from_access_list() {
         let addrs = vec![
             SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 7788),
-            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 10)), 7788),
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 0, 2, 10)), 7788),
         ];
         let host = pick_lan_host(&addrs, None).unwrap();
-        assert_eq!(host, "192.168.1.10");
+        assert_eq!(host, "192.0.2.10");
     }
 
     #[test]

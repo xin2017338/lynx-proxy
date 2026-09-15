@@ -2,8 +2,6 @@ export type AdbSource = 'none' | 'path' | 'bundled'
 
 export type InstallPhase = 'idle' | 'downloading' | 'extracting' | 'done' | 'failed'
 
-export type ProxyMode = 'lan' | 'usb_reverse'
-
 export interface AdbStatus {
   ready: boolean
   adbPath?: string | null
@@ -26,22 +24,20 @@ export interface AdbDevice {
 }
 
 export interface DeviceRowState {
-  proxyEnabled: boolean
+  /** Actual value read from Android's global http_proxy setting. */
+  currentHttpProxy?: string | null
+  proxyStateError?: string | null
 }
 
 export interface ProxyState {
   serial: string
   currentHttpProxy?: string | null
   lynxManaged: boolean
-  mode?: ProxyMode | null
-  reverseActive: boolean
-  backupHttpProxy?: string | null
 }
 
 export interface EnableProxyPayload {
   serial: string
-  mode: ProxyMode
-  host?: string
+  host: string
   port?: number
 }
 

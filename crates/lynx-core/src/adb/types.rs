@@ -56,31 +56,19 @@ pub struct AdbDevice {
     pub product: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum ProxyMode {
-    Lan,
-    UsbReverse,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProxyState {
     pub serial: String,
     pub current_http_proxy: Option<String>,
     pub lynx_managed: bool,
-    pub mode: Option<ProxyMode>,
-    pub reverse_active: bool,
-    pub backup_http_proxy: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EnableProxyPayload {
     pub serial: String,
-    pub mode: ProxyMode,
-    #[serde(default)]
-    pub host: Option<String>,
+    pub host: String,
     #[serde(default)]
     pub port: Option<u16>,
 }

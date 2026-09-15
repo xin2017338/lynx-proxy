@@ -16,7 +16,7 @@ import type {
   AndroidDevicePreview,
   DeviceRowState,
   InstallProgress,
-  ProxyMode,
+  ProxyState,
 } from './types'
 
 const props = defineProps<{
@@ -50,13 +50,21 @@ const headerStatusLoading = computed(() => (
 
 function ensureRow(serial: string): DeviceRowState {
   if (!deviceStates[serial]) {
-    deviceStates[serial] = { proxyEnabled: false }
+    deviceStates[serial] = { currentHttpProxy: undefined }
   }
   return deviceStates[serial]
 }
 
-function setDeviceProxyEnabled(serial: string, enabled: boolean) {
-  deviceStates[serial] = { proxyEnabled: enabled }
+function applyDeviceProxyState(state: ProxyState) {
+  deviceStates[state.serial] = {
+    currentHttpProxy: state.currentHttpProxy ?? null,
+    proxyStateError: null,
+  }
+}
+
+function proxyEnabled(serial: string): boolean {
+  const value = deviceStates[serial]?.currentHttpProxy?.trim()
+  return Boolean(value && value !== ':0' && value !== 'null')
 }
 
 function applyPreview(p: AndroidDevicePreview) {
@@ -120,16 +128,6 @@ function defaultLanHost(): string | undefined {
   return undefined
 }
 
-/** Prefer WiFi/LAN when available, otherwise USB adb reverse. */
-function proxyModesToTry(): ProxyMode[] {
-  const modes: ProxyMode[] = []
-  if (!localOnly.value && defaultLanHost()) {
-    modes.push('lan')
-  }
-  modes.push('usb_reverse')
-  return modes
-}
-
 function deviceLabel(device: AdbDevice): string {
   return device.model ?? device.serial
 }
@@ -161,9 +159,12 @@ async function syncDeviceProxyState(serial: string) {
   }
   try {
     const state = await ctrl.getProxyState(serial)
-    setDeviceProxyEnabled(serial, Boolean(state.lynxManaged))
-  } catch {
-    setDeviceProxyEnabled(serial, false)
+    applyDeviceProxyState(state)
+  } catch (err) {
+    deviceStates[serial] = {
+      currentHttpProxy: undefined,
+      proxyStateError: String(err),
+    }
   }
 }
 
@@ -253,10 +254,12 @@ async function onRefreshDevices() {
 
 async function onToggleProxy(device: AdbDevice) {
   const serial = device.serial
-  const wasEnabled = ensureRow(serial).proxyEnabled
 
   if (isPreview.value) {
-    setDeviceProxyEnabled(serial, !wasEnabled)
+    const enabled = proxyEnabled(serial)
+    deviceStates[serial] = {
+      currentHttpProxy: enabled ? null : `${defaultLanHost() ?? 'proxy.lynx.example'}:${port.value}`,
+    }
     return
   }
 
@@ -270,36 +273,28 @@ async function onToggleProxy(device: AdbDevice) {
   error.value = null
 
   try {
+    // Always decide from the device's current global setting, not cached UI state.
+    const current = await ctrl.getProxyState(serial)
+    applyDeviceProxyState(current)
+    const wasEnabled = proxyEnabled(serial)
+
     if (wasEnabled) {
-      await ctrl.disableProxy(serial)
-      setDeviceProxyEnabled(serial, false)
-      await syncDeviceProxyState(serial)
+      applyDeviceProxyState(await ctrl.disableProxy(serial))
     } else {
-      const modes = proxyModesToTry()
-      let lastError: unknown
-      let enabled = false
-
-      for (const mode of modes) {
-        try {
-          await ctrl.enableProxy({
-            serial,
-            mode,
-            host: mode === 'lan' ? defaultLanHost() : undefined,
-            port: port.value,
-          })
-          enabled = true
-          break
-        } catch (err) {
-          lastError = err
-        }
+      if (localOnly.value) {
+        throw new Error('当前服务仅本机可访问，请关闭 --local-only 后再开启手机代理')
       }
 
-      if (enabled) {
-        await syncDeviceProxyState(serial)
-      } else {
-        setDeviceProxyEnabled(serial, false)
-        error.value = String(lastError ?? '开启代理失败')
+      const host = defaultLanHost()
+      if (!host) {
+        throw new Error('未找到可用局域网地址，请检查网络后重试')
       }
+
+      applyDeviceProxyState(await ctrl.enableProxy({
+        serial,
+        host,
+        port: port.value,
+      }))
     }
   } catch (err) {
     error.value = String(err)
@@ -414,6 +409,20 @@ onMounted(() => {
               <p class="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">
                 {{ device.serial }}
               </p>
+              <p
+                v-if="proxyEnabled(device.serial)"
+                class="mt-0.5 truncate font-mono text-[10px] text-muted-foreground"
+                :title="deviceStates[device.serial]?.currentHttpProxy ?? undefined"
+              >
+                代理 {{ deviceStates[device.serial]?.currentHttpProxy }}
+              </p>
+              <p
+                v-else-if="deviceStates[device.serial]?.currentHttpProxy === undefined"
+                class="mt-0.5 text-[10px] text-amber-600"
+                :title="deviceStates[device.serial]?.proxyStateError ?? undefined"
+              >
+                代理状态未知
+              </p>
             </div>
             <div
               v-if="device.state === 'device'"
@@ -426,7 +435,7 @@ onMounted(() => {
                 variant="ghost"
                 size="sm"
                 class="h-6 min-w-[4.5rem] gap-1 px-2 text-[11px]"
-                :class="deviceStates[device.serial]?.proxyEnabled ? 'text-destructive hover:text-destructive' : ''"
+                :class="proxyEnabled(device.serial) ? 'text-destructive hover:text-destructive' : ''"
                 :disabled="!canToggleProxy(device) || togglingSerial === device.serial"
                 @click="onToggleProxy(device)"
               >
@@ -435,7 +444,7 @@ onMounted(() => {
                   class="size-3"
                 />
                 <template v-else>
-                  {{ deviceStates[device.serial]?.proxyEnabled ? '关闭代理' : '开启代理' }}
+                  {{ proxyEnabled(device.serial) ? '关闭代理' : '开启代理' }}
                 </template>
               </Button>
             </div>

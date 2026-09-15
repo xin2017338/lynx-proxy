@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.12] - 2026-09-04
+
+### ♻️ Refactor
+
+- *(android)* Simplify ADB proxy control to one LAN flow: enable sets `host:port`, disable always clears `http_proxy` with `:0`
+- *(android)* Remove backup/restore proxy persistence and USB reverse fallback to make device proxy behavior deterministic
+
 ## [0.8.11] - 2026-09-04
 
 ### 🐛 Bug Fixes

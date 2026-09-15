@@ -10,7 +10,6 @@ import {
   PREVIEW_DEVICES_LISTED,
   PREVIEW_LAN_BLOCKED,
   PREVIEW_PROXY_ENABLED,
-  PREVIEW_PROXY_USB_MODE,
   PREVIEW_READY_NO_DEVICES,
 } from './fixtures'
 
@@ -48,7 +47,6 @@ export const Adb_NotInstalled: Story = panelStory(PREVIEW_ADB_NOT_INSTALLED)
 export const Adb_Downloading: Story = panelStory(PREVIEW_ADB_DOWNLOADING)
 export const Adb_InstallFailed: Story = panelStory(PREVIEW_ADB_INSTALL_FAILED)
 export const Proxy_Enabled: Story = panelStory(PREVIEW_PROXY_ENABLED)
-export const Proxy_Usb_Mode: Story = panelStory(PREVIEW_PROXY_USB_MODE)
 export const LanBlocked_LocalOnly: Story = panelStory(PREVIEW_LAN_BLOCKED)
 
 export const Loading: Story = {

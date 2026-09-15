@@ -15,7 +15,7 @@ export const FIXTURE_DEVICES = [
   },
 ] as const
 
-export const FIXTURE_BASE_ADDRESSES = ['192.168.1.42:7788', '10.0.0.5:7788']
+export const FIXTURE_BASE_ADDRESSES = ['proxy.lynx.example:7788', 'backup.lynx.example:7788']
 
 function states(entries: Record<string, DeviceRowState>): Record<string, DeviceRowState> {
   return entries
@@ -34,8 +34,8 @@ export const PREVIEW_DEVICES_LISTED: AndroidDevicePreview = {
   ...PREVIEW_READY_NO_DEVICES,
   devices: [...FIXTURE_DEVICES],
   deviceStates: states({
-    'emulator-5554': { proxyEnabled: false },
-    'R58M90ABCDE': { proxyEnabled: false },
+    'emulator-5554': { currentHttpProxy: null },
+    'R58M90ABCDE': { currentHttpProxy: null },
   }),
 }
 
@@ -71,13 +71,9 @@ export const PREVIEW_ADB_INSTALL_FAILED: AndroidDevicePreview = {
 export const PREVIEW_PROXY_ENABLED: AndroidDevicePreview = {
   ...PREVIEW_DEVICES_LISTED,
   deviceStates: states({
-    'emulator-5554': { proxyEnabled: true },
-    'R58M90ABCDE': { proxyEnabled: false },
+    'emulator-5554': { currentHttpProxy: 'proxy.lynx.example:7788' },
+    'R58M90ABCDE': { currentHttpProxy: null },
   }),
-}
-
-export const PREVIEW_PROXY_USB_MODE: AndroidDevicePreview = {
-  ...PREVIEW_PROXY_ENABLED,
 }
 
 export const PREVIEW_LAN_BLOCKED: AndroidDevicePreview = {
