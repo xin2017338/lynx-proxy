@@ -65,6 +65,7 @@ pub mod op {
     pub const WEBSOCKET_MESSAGE: &str = "websocket.message";
     pub const WEBSOCKET_ERROR: &str = "websocket.error";
     pub const WEBSOCKET_END: &str = "websocket.end";
+    pub const SYSTEM_EVENT_GAP: &str = "system.event_gap";
     pub const SYSTEM_ERROR: &str = "system.error";
 
     pub fn is_request_op(op: &str) -> bool {
@@ -128,6 +129,7 @@ pub mod op {
                 | "websocket.message"
                 | "websocket.error"
                 | "websocket.end"
+                | "system.event_gap"
                 | "system.error"
         )
     }

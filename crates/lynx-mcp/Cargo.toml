@@ -1,0 +1,30 @@
+[package]
+name = "lynx-mcp"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "MCP server for analyzing traffic captured by Lynx Proxy"
+homepage.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "lynx-mcp"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+base64 = "0.22"
+clap = { version = "4", features = ["derive", "env"] }
+futures-util.workspace = true
+rmcp = { version = "3.3", features = ["server", "transport-io", "schemars"] }
+schemars = "1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio.workspace = true
+tokio-tungstenite.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+url = "2"
+uuid = { version = "1", features = ["v4"] }

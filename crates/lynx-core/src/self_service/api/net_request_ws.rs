@@ -2111,6 +2111,16 @@ async fn message_events_ws_handler(socket: WebSocket, state: RouteState) {
                     }
                     Err(broadcast::error::RecvError::Lagged(skipped)) => {
                         warn!("ws event subscriber lagged, skipped {} events", skipped);
+                        send_frame(
+                            &mut socket_tx,
+                            event_frame(
+                                op::SYSTEM_EVENT_GAP.to_string(),
+                                json!({
+                                    "skipped": skipped,
+                                    "occurredAt": now_millis(),
+                                }),
+                            ),
+                        ).await;
                     }
                     Err(broadcast::error::RecvError::Closed) => {
                         error!("message event channel closed");

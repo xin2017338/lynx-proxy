@@ -84,6 +84,7 @@ x-lynx-ops:
     - websocket.message
     - websocket.error
     - websocket.end
+    - system.event_gap
     - system.error
 components:
   messages:

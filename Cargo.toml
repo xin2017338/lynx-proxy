@@ -8,6 +8,7 @@ members = [
     "crates/lynx-cert",
     "crates/lynx-mock",
     "crates/lynx-storage",
+    "crates/lynx-mcp",
 ]
 resolver = "2"
 

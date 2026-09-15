@@ -69,6 +69,7 @@ export const WsOp = {
   WebsocketMessage: 'websocket.message',
   WebsocketError: 'websocket.error',
   WebsocketEnd: 'websocket.end',
+  SystemEventGap: 'system.event_gap',
   SystemError: 'system.error',
 } as const
 
@@ -127,6 +128,7 @@ export type WsEventOp =
   | 'websocket.message'
   | 'websocket.error'
   | 'websocket.end'
+  | 'system.event_gap'
   | 'system.error'
 
 export interface WsErrorPayload {
