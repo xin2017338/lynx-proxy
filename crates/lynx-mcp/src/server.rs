@@ -392,6 +392,12 @@ fn export_curl(item: &CapturedExchange) -> String {
         ),
     ];
     for (name, value) in redaction::headers(&item.request.headers) {
+        if ["content-length", "connection", "host", "proxy-connection"]
+            .iter()
+            .any(|header| name.eq_ignore_ascii_case(header))
+        {
+            continue;
+        }
         parts.push(format!("-H {}", shell_quote(&format!("{name}: {value}"))));
     }
     if !item.request.body.bytes.is_empty() {
@@ -433,4 +439,28 @@ fn list_result(session_id: &str, mut items: Vec<CapturedExchange>, limit: usize)
     let summaries: Vec<_> = items.iter().map(Summary::from).collect();
     json!({ "sessionId": session_id, "items": summaries, "nextCursor": next, "hasMore": has_more })
         .to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn curl_export_omits_transport_headers_after_redaction() {
+        let mut item = CapturedExchange::placeholder("trace".to_owned(), 1);
+        item.request.method = Some("POST".to_owned());
+        item.request.url = Some("https://example.com/login?token=secret".to_owned());
+        item.request
+            .headers
+            .insert("content-length".to_owned(), "99".to_owned());
+        item.request
+            .headers
+            .insert("authorization".to_owned(), "Bearer secret".to_owned());
+        item.request.body.bytes = br#"{"password":"secret"}"#.to_vec();
+        let curl = export_curl(&item);
+        assert!(!curl.contains("content-length"));
+        assert!(!curl.contains("Bearer secret"));
+        assert!(!curl.contains("\"secret\""));
+        assert!(curl.contains("[REDACTED]"));
+    }
 }
