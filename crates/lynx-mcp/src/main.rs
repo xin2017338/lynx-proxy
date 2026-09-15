@@ -30,6 +30,9 @@ struct Args {
     max_memory_mb: usize,
     #[arg(long, default_value_t = 2)]
     max_body_mb: usize,
+    /// Return raw credentials, cookies, tokens, and secret fields from MCP tools.
+    #[arg(long, default_value_t = false)]
+    allow_sensitive_data: bool,
 }
 
 #[tokio::main]
@@ -58,7 +61,11 @@ async fn main() -> Result<()> {
         args.pass,
         Arc::clone(&store),
     ));
-    let server = server::LynxMcpServer::new(store, Arc::clone(&collector.status));
+    let server = server::LynxMcpServer::new(
+        store,
+        Arc::clone(&collector.status),
+        args.allow_sensitive_data,
+    );
     tokio::spawn(collector.run());
     server.serve(stdio()).await?.waiting().await?;
     Ok(())

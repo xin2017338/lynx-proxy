@@ -32,3 +32,11 @@ Available tools:
 - `export_captured_request`
 
 Sensitive headers and common secret query parameters are redacted from tool results.
+
+To return raw captured credentials, cookies, tokens, query parameters, and body fields from every tool, start the server with:
+
+```bash
+lynx-mcp --allow-sensitive-data
+```
+
+This is a single global switch. Tool calls do not need an additional parameter.
