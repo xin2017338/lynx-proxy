@@ -8,6 +8,14 @@ use tower::Service;
 
 use crate::common::Req;
 
+/// Transport authority selected by the outer CONNECT request.
+///
+/// This can differ from the logical HTTP `Host` used inside the tunnel (for
+/// example with domain fronting). Keep it as request metadata so capture/UI
+/// code can display the logical host without changing upstream routing.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConnectAuthority(pub Authority);
+
 #[derive(Debug, Clone)]
 pub struct ConnectReqPatchService<S> {
     pub service: S,
@@ -30,6 +38,9 @@ where
     fn call(&mut self, request: Req) -> Self::Future {
         let req = if matches!(request.version(), Version::HTTP_10 | Version::HTTP_11) {
             let (mut parts, body) = request.into_parts();
+            parts
+                .extensions
+                .insert(ConnectAuthority(self.authority.clone()));
             parts.uri = {
                 let mut parts = parts.uri.into_parts();
                 parts.scheme = Some(self.schema.clone());

@@ -78,6 +78,17 @@ fn compiles_scheme_host_port_path() {
 }
 
 #[test]
+fn compiles_bare_protocol_to_a_single_scheme_predicate() {
+    let program = compile_match_expr("HTTPS://").unwrap();
+    assert_eq!(program.predicates.len(), 1);
+    assert!(matches!(
+        &program.predicates[0],
+        Predicate::SchemeEq(scheme) if scheme.as_ref() == "https"
+    ));
+    assert!(matches!(program.plan, EvalPlan::Pred(0)));
+}
+
+#[test]
 fn compiles_cli_method_and_headers() {
     let program = compile_match_expr("example.com -X POST --header Authorization=Bearer").unwrap();
     assert!(

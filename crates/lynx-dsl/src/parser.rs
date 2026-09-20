@@ -209,7 +209,7 @@ fn parse_url(
     let mut parts = UrlParts::default();
 
     match child.as_rule() {
-        Rule::scheme_url | Rule::host_url => {
+        Rule::scheme_url | Rule::scheme_only | Rule::host_url => {
             for part in child.into_inner() {
                 apply_url_part(part, source, base_offset, &mut parts);
             }

@@ -100,6 +100,34 @@ fn scheme_host_port_path_matches() {
 }
 
 #[test]
+fn bare_protocol_matches_only_requests_with_that_protocol() {
+    assert_matches(
+        "https://",
+        RequestFacts::builder()
+            .scheme("https")
+            .host("any.example.com")
+            .path("/anything"),
+        true,
+    );
+    assert_matches(
+        "https://",
+        RequestFacts::builder()
+            .scheme("http")
+            .host("any.example.com")
+            .path("/anything"),
+        false,
+    );
+    assert_matches(
+        "wss:// OR https://",
+        RequestFacts::builder()
+            .scheme("wss")
+            .host("socket.example.com")
+            .path("/events"),
+        true,
+    );
+}
+
+#[test]
 fn path_glob_single_segment_wildcard() {
     assert_matches(
         "/api/*/v1",

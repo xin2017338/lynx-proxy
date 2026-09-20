@@ -13,9 +13,12 @@ primary_fragment = { cli_only | url_primary }
 
 url_primary = { url ~ cli_args? }
 
-url = { scheme_url | host_url | path_url | query_only }
+url = { scheme_url | scheme_only | host_url | path_url | query_only }
 path_url = { path ~ query? }
 scheme_url = { scheme ~ host ~ port? ~ path? ~ query? }
+// A bare protocol is a first-class matcher: `https://` matches every HTTPS
+// request, and likewise for the other supported protocols.
+scheme_only = { scheme }
 host_url = { host_spaced | host_with_port | host_only }
 host_only = { host ~ path? ~ query? }
 host_with_port = { host ~ port ~ path? ~ query? }

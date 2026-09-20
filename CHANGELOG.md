@@ -2,7 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.8.12] - 2026-09-04
+## [0.8.12] - 2026-09-18
+
+### 🚀 Features
+
+- *(api-studio)* Handle large and media responses with configurable body limits and improved response previews
+- *(dsl)* Support bare `http://`, `https://`, `ws://`, and `wss://` protocol matchers
+
+### 🐛 Bug Fixes
+
+- *(capture)* Display the inner HTTP Host when it differs from the outer HTTPS CONNECT authority
 
 ### ♻️ Refactor
 

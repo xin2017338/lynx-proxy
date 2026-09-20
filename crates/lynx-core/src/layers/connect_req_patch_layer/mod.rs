@@ -1,3 +1,3 @@
 pub mod service;
 
-pub use service::ConnectReqPatchService;
+pub use service::{ConnectAuthority, ConnectReqPatchService};

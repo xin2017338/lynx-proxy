@@ -28,6 +28,10 @@ describe.skipIf(!dslWasmAvailable)('formatDsl', () => {
     )
   })
 
+  it('accepts bare protocols as request matchers', () => {
+    expect(formatDsl('https:// or wss://')).toBe('https://\nOR wss://')
+  })
+
   it('formats grouped OR inside parentheses across multiple lines', () => {
     expect(formatDsl('( example.com  or  /api/ )   and   not   https://example.com/health')).toBe(
       '(\n  example.com\n  OR /api/\n)\nAND NOT https://example.com/health',

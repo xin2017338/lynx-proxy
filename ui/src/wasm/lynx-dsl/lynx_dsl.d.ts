@@ -1,14 +1,14 @@
 /* tslint:disable */
 /* eslint-disable */
-export function validate_dsl_document_wasm(source: string): any;
-export function validate_dsl(source: string): any;
-export function has_dsl_parse_errors(source: string): boolean;
-export function collect_dsl_syntax_diagnostics(source: string): any;
-export function parse_dsl_program_wasm(source: string): any;
-export function compile_match_expr_wasm(source: string): any;
-export function init(): void;
 export function eval_program_wasm(program: any, facts: any): boolean;
 export function format_dsl_wasm(source: string): string | undefined;
+export function init(): void;
+export function collect_dsl_syntax_diagnostics(source: string): any;
+export function compile_match_expr_wasm(source: string): any;
+export function validate_dsl(source: string): any;
+export function parse_dsl_program_wasm(source: string): any;
+export function validate_dsl_document_wasm(source: string): any;
+export function has_dsl_parse_errors(source: string): boolean;
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 

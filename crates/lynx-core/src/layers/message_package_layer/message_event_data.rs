@@ -1,4 +1,5 @@
 use crate::common::BoxBody;
+use crate::layers::connect_req_patch_layer::ConnectAuthority;
 use crate::utils::empty;
 use anyhow::anyhow;
 use axum::body::Body as AxumBody;
@@ -287,6 +288,29 @@ fn connect_tunnel_url(authority: &str) -> String {
     format!("{default_scheme}://{authority}")
 }
 
+fn tunneled_logical_url<B: Body>(req: &Request<B>, parsed: &Url) -> Option<String> {
+    req.extensions().get::<ConnectAuthority>()?;
+    let authority = req
+        .headers()
+        .get(http::header::HOST)?
+        .to_str()
+        .ok()?
+        .parse::<http::uri::Authority>()
+        .ok()?;
+
+    let query = parsed
+        .query()
+        .map(|value| format!("?{value}"))
+        .unwrap_or_default();
+    Some(format!(
+        "{}://{}{}{}",
+        parsed.scheme(),
+        authority,
+        parsed.path(),
+        query
+    ))
+}
+
 fn request_url_from_http<B: Body>(req: &Request<B>) -> String {
     let uri_str = req.uri().to_string();
     let mut url = if *req.method() == Method::CONNECT {
@@ -294,7 +318,7 @@ fn request_url_from_http<B: Body>(req: &Request<B>) -> String {
     } else if let Ok(parsed) = Url::parse(&uri_str) {
         let scheme = parsed.scheme();
         if scheme == "http" || scheme == "https" || scheme == "ws" || scheme == "wss" {
-            parsed.to_string()
+            tunneled_logical_url(req, &parsed).unwrap_or_else(|| parsed.to_string())
         } else {
             uri_str.clone()
         }

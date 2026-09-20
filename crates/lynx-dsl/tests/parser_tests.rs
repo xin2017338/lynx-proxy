@@ -78,6 +78,23 @@ fn parses_supported_schemes() {
 }
 
 #[test]
+fn parses_bare_protocol_matchers() {
+    for scheme in ["http://", "https://", "ws://", "wss://"] {
+        assert!(!has_parse_errors(scheme), "failed for {scheme}");
+        assert_eq!(node_kinds(scheme, "Scheme"), vec![scheme]);
+        assert!(node_kinds(scheme, "Host").is_empty());
+    }
+}
+
+#[test]
+fn formats_bare_protocol_in_boolean_expression() {
+    assert_eq!(
+        format_dsl("https:// or wss://").unwrap(),
+        Some("https://\nOR wss://".to_string())
+    );
+}
+
+#[test]
 fn parses_path_only_operands() {
     assert_eq!(node_kinds("/a", "Path"), vec!["/a"]);
     assert_eq!(node_kinds("/a*", "Path"), vec!["/a*"]);
