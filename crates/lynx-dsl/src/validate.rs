@@ -88,7 +88,7 @@ fn diagnostic_from_parse_error(
         crate::error::ParseError::Syntax { span, message: _ } => {
             let from = span.start.min(source.len());
             let to = span.end.max(from + 1).min(source.len());
-            let snippet = source[span.start..span.end].trim();
+            let snippet = source.get(from..to).unwrap_or("").trim();
             let message = if snippet.is_empty() {
                 "Syntax error".to_string()
             } else {

@@ -13,7 +13,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.8.12"
+version = "0.8.13"
 authors = ["xin2017338"]
 description = "Lynx Proxy Server"
 edition = "2024"

@@ -108,6 +108,46 @@ fn bare_keyword_can_mix_with_other_clauses() {
 }
 
 #[test]
+fn localhost_and_numeric_tokens_do_not_use_fuzzy_matching() {
+    assert_matches(
+        "localhost",
+        RequestFacts::builder()
+            .host("example.com")
+            .path("/localhost"),
+        false,
+    );
+    assert_matches(
+        "localhost",
+        RequestFacts::builder().host("localhost").path("/api"),
+        true,
+    );
+    assert_matches(
+        "123",
+        RequestFacts::builder()
+            .host("example.com")
+            .path("/users/123"),
+        false,
+    );
+}
+
+#[test]
+fn dotted_host_token_does_not_match_path_or_query_as_fuzzy() {
+    assert_matches(
+        "apple.com",
+        RequestFacts::builder().host("www.b.com").path("/apple.com"),
+        false,
+    );
+    assert_matches(
+        "apple.com",
+        RequestFacts::builder()
+            .host("www.b.com")
+            .path("/search")
+            .query("q=apple.com"),
+        false,
+    );
+}
+
+#[test]
 fn host_is_case_insensitive() {
     assert_matches(
         "Example.COM",

@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.13] - 2026-10-29
+
+### 🐛 Bug Fixes
+
+- *(dsl)* Prevent WASM validation panic (`RuntimeError: unreachable`) on invalid editor input by using bounds-safe parse error snippets
+- *(dsl)* Keep fuzzy-keyword detection constrained to bare alphanumeric tokens so hyphenated host labels continue to use host semantics
+
+### 🧪 Testing
+
+- *(dsl)* Add fuzzy matching boundary tests for compile/eval/highlight paths (`localhost`, numeric tokens, dotted host tokens, mixed expressions)
+- *(dsl)* Add regression test to ensure invalid DSL validation never panics
+
 ## [0.8.12] - 2026-09-18
 
 ### 🚀 Features

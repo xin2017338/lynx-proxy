@@ -25,6 +25,37 @@ fn highlights_bare_keyword_as_fuzzy_keyword() {
 }
 
 #[test]
+fn highlights_fuzzy_keyword_case_insensitively() {
+    let input = "Apple";
+    assert!(!has_parse_errors(input));
+    assert_eq!(node_kinds(input, "FuzzyKeyword"), vec![input]);
+}
+
+#[test]
+fn highlights_fuzzy_and_host_in_mixed_expression() {
+    let input = "apple AND example.com";
+    assert!(!has_parse_errors(input));
+    assert_eq!(node_kinds(input, "FuzzyKeyword"), vec!["apple"]);
+    assert_eq!(node_kinds(input, "Host"), vec!["example.com"]);
+}
+
+#[test]
+fn keeps_localhost_highlighted_as_host() {
+    let input = "localhost";
+    assert!(!has_parse_errors(input));
+    assert_eq!(node_kinds(input, "Host"), vec![input]);
+    assert!(node_kinds(input, "FuzzyKeyword").is_empty());
+}
+
+#[test]
+fn keeps_numeric_token_highlighted_as_host() {
+    let input = "123";
+    assert!(!has_parse_errors(input));
+    assert_eq!(node_kinds(input, "Host"), vec![input]);
+    assert!(node_kinds(input, "FuzzyKeyword").is_empty());
+}
+
+#[test]
 fn parses_hyphenated_domain() {
     let input = "api.example-ex.com";
     assert!(!has_parse_errors(input));

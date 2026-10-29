@@ -67,6 +67,36 @@ fn compiles_bare_keyword_to_fuzzy_predicate() {
 }
 
 #[test]
+fn keeps_localhost_as_host_predicate() {
+    let program = compile_match_expr("localhost").unwrap();
+    assert_eq!(program.predicates.len(), 1);
+    assert!(matches!(
+        &program.predicates[0],
+        Predicate::HostEq(value) if value.as_ref() == "localhost"
+    ));
+}
+
+#[test]
+fn keeps_hyphenated_single_label_as_host_predicate() {
+    let program = compile_match_expr("example-ex").unwrap();
+    assert_eq!(program.predicates.len(), 1);
+    assert!(matches!(
+        &program.predicates[0],
+        Predicate::HostEq(value) if value.as_ref() == "example-ex"
+    ));
+}
+
+#[test]
+fn keeps_numeric_token_as_host_predicate() {
+    let program = compile_match_expr("123").unwrap();
+    assert_eq!(program.predicates.len(), 1);
+    assert!(matches!(
+        &program.predicates[0],
+        Predicate::HostEq(value) if value.as_ref() == "123"
+    ));
+}
+
+#[test]
 fn compiles_not_or_grouping() {
     let program = compile_match_expr("NOT (example.com OR /api)").unwrap();
     assert!(matches!(program.plan, EvalPlan::Not(_)));
