@@ -111,6 +111,7 @@ flowchart LR
 | 形式 | 示例 | 含义 |
 |------|------|------|
 | Host | `example.com` | 主机匹配（含子域，如 `api.example.com`） |
+| 模糊关键词 | `apple` | 仅关键词（不含 `.`）时，对完整 URL 目标（`host + path + ?query`）做模糊包含（不区分大小写） |
 | Host + 端口 | `example.com:8080` | 主机与端口 |
 | 路径 | `/api/v1` | 路径前缀（`/api` 也匹配 `/api/foo`） |
 | Glob | `/api/*/v1`、`/api/**/track` | 单段 `*` / 多段 `**` 通配 |
@@ -140,6 +141,7 @@ NOT */rest/* AND -X POST
 **匹配说明**
 
 - 只写路径时不校验 host；只写 `?k=v` 时不校验路径。
+- 仅关键词的模糊匹配只检查完整 URL 目标（`host + path + ?query`）；不会匹配 method/header。
 - URL 内嵌的 `?a=1&b=2` 为子集语义，实际请求可带更多 query 参数。
 - 表达式未包含 `?…` 时，路径匹配与 query 无关。
 - **origin-form** 请求（URI 仅有 path）时，host/port 来自 **Host** 头。

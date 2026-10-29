@@ -3,7 +3,9 @@ use http::StatusCode;
 use http_body_util::{BodyExt, Full};
 use lynx_storage::dao::request_processing_dao::handlers::modify_response_handler::ModifyResponseConfig;
 
-use super::handler_trait::{HandleRequestType, HandlerTrait};
+use super::handler_trait::{
+    HandleRequestType, HandlerTrait, prepare_headers_for_replaced_body, response_status_allows_body,
+};
 use crate::{common::Req, error::CoreResult};
 
 #[async_trait::async_trait]
@@ -36,16 +38,16 @@ impl HandlerTrait for ModifyResponseConfig {
 
         // Modify body if specified
         if let Some(ref new_body) = self.modify_body {
-            let body_bytes = new_body.as_bytes().to_vec();
+            let status_allows_body = response_status_allows_body(response.status());
+            let body_bytes = if status_allows_body {
+                new_body.as_bytes().to_vec()
+            } else {
+                Vec::new()
+            };
 
-            // Remove compression-related headers since the response is being modified
-            let headers = response.headers_mut();
-            headers.remove("content-encoding");
-            headers.remove("transfer-encoding");
-
-            // Update content-length header
-            if let Ok(content_length) = body_bytes.len().to_string().parse() {
-                headers.insert("content-length", content_length);
+            prepare_headers_for_replaced_body(response.headers_mut(), body_bytes.len());
+            if !status_allows_body {
+                response.headers_mut().remove("content-length");
             }
 
             // Replace the body with the new content
@@ -95,7 +97,6 @@ mod tests {
         let config = ModifyResponseConfig {
             modify_headers: Some(headers),
             modify_body: None,
-            modify_method: None,
             modify_status_code: None,
         };
 
@@ -116,7 +117,6 @@ mod tests {
         let config = ModifyResponseConfig {
             modify_headers: None,
             modify_body: None,
-            modify_method: None,
             modify_status_code: Some(404),
         };
 
@@ -134,7 +134,6 @@ mod tests {
         let config = ModifyResponseConfig {
             modify_headers: None,
             modify_body: Some(new_body_content.to_string()),
-            modify_method: None,
             modify_status_code: None,
         };
 
@@ -157,7 +156,6 @@ mod tests {
         let config = ModifyResponseConfig {
             modify_headers: Some(headers),
             modify_body: Some(new_body_content.to_string()),
-            modify_method: None,
             modify_status_code: Some(201),
         };
 
@@ -180,7 +178,6 @@ mod tests {
         let config = ModifyResponseConfig {
             modify_headers: None,
             modify_body: None,
-            modify_method: None,
             modify_status_code: None,
         };
 
@@ -205,7 +202,6 @@ mod tests {
         let config = ModifyResponseConfig {
             modify_headers: None,
             modify_body: None,
-            modify_method: None,
             modify_status_code: None,
         };
 
@@ -229,7 +225,6 @@ mod tests {
         let config = ModifyResponseConfig {
             modify_headers: None,
             modify_body: None,
-            modify_method: None,
             modify_status_code: Some(99), // Invalid status code (below 100)
         };
 
@@ -254,7 +249,6 @@ mod tests {
         let config = ModifyResponseConfig {
             modify_headers: Some(headers),
             modify_body: None,
-            modify_method: None,
             modify_status_code: None,
         };
 
@@ -275,7 +269,6 @@ mod tests {
         let config = ModifyResponseConfig {
             modify_headers: None,
             modify_body: Some(new_body_content.to_string()),
-            modify_method: None,
             modify_status_code: None,
         };
 
@@ -287,17 +280,51 @@ mod tests {
         response
             .headers_mut()
             .insert("transfer-encoding", "chunked".parse().unwrap());
+        response
+            .headers_mut()
+            .insert("etag", "\"old-body\"".parse().unwrap());
+        response
+            .headers_mut()
+            .insert("digest", "sha-256=old".parse().unwrap());
+        response
+            .headers_mut()
+            .insert("content-range", "bytes 0-3/4".parse().unwrap());
 
         let result = config.handle_response(response).await?;
 
         // Check that compression headers are removed
         assert!(result.headers().get("content-encoding").is_none());
         assert!(result.headers().get("transfer-encoding").is_none());
+        assert!(result.headers().get("etag").is_none());
+        assert!(result.headers().get("digest").is_none());
+        assert!(result.headers().get("content-range").is_none());
 
         // Check content-length header is updated
         let content_length = result.headers().get("content-length").unwrap();
         assert_eq!(content_length, &new_body_content.len().to_string());
 
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_modify_body_keeps_body_empty_for_no_content_response() -> Result<()> {
+        let config = ModifyResponseConfig {
+            modify_headers: None,
+            modify_body: Some("must not be sent".to_string()),
+            modify_status_code: Some(204),
+        };
+        let response = create_test_response();
+
+        let result = config.handle_response(response).await?;
+
+        assert_eq!(result.status(), StatusCode::NO_CONTENT);
+        assert!(result.headers().get("content-length").is_none());
+        assert!(
+            BodyExt::collect(result.into_body())
+                .await?
+                .to_bytes()
+                .is_empty()
+        );
         Ok(())
     }
 }

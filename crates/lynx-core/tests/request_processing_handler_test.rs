@@ -349,7 +349,6 @@ async fn modify_response_handler_status_code() -> Result<()> {
         vec![HandlerRule::modify_response_handler(
             None,
             None,
-            None,
             Some(202), // Change status code to 202 Accepted
         )],
     )
@@ -381,7 +380,6 @@ async fn modify_response_handler_headers() -> Result<()> {
         proxy_server.data_store,
         vec![HandlerRule::modify_response_handler(
             Some(headers),
-            None,
             None,
             None,
         )],
@@ -416,7 +414,6 @@ async fn modify_response_handler_body() -> Result<()> {
             None,
             Some(modified_body.to_string()),
             None,
-            None,
         )],
     )
     .await?;
@@ -450,7 +447,6 @@ async fn modify_response_handler_multiple_modifications() -> Result<()> {
         vec![HandlerRule::modify_response_handler(
             Some(headers),
             Some(modified_body.to_string()),
-            None,
             Some(201), // Created status
         )],
     )
@@ -483,7 +479,7 @@ async fn modify_response_handler_no_modifications() -> Result<()> {
         proxy_server.data_store,
         vec![HandlerRule::modify_response_handler(
             None, // No modifications
-            None, None, None,
+            None, None,
         )],
     )
     .await?;

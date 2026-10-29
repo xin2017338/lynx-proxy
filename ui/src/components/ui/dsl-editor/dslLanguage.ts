@@ -8,6 +8,7 @@ export const dslHighlightColors = {
   keyword: 'var(--color-chart-2)',
   scheme: 'var(--color-chart-4)',
   host: 'var(--color-chart-1)',
+  fuzzyKeyword: 'var(--color-secondary-foreground)',
   port: 'var(--color-chart-5)',
   path: 'var(--color-chart-3)',
   query: 'var(--color-chart-6)',
@@ -23,6 +24,7 @@ const highlightClassByKind: Record<string, string> = {
   NotOp: 'cm-dsl-keyword',
   Scheme: 'cm-dsl-scheme',
   Host: 'cm-dsl-host',
+  FuzzyKeyword: 'cm-dsl-fuzzy-keyword',
   Port: 'cm-dsl-port',
   Path: 'cm-dsl-path',
   Query: 'cm-dsl-query',
@@ -80,6 +82,12 @@ const dslHighlightTheme = EditorView.baseTheme({
   '.cm-dsl-host': {
     color: dslHighlightColors.host,
     fontWeight: '650',
+  },
+  '.cm-dsl-fuzzy-keyword': {
+    color: dslHighlightColors.fuzzyKeyword,
+    fontWeight: '650',
+    textDecoration: 'underline',
+    textDecorationThickness: '1px',
   },
   '.cm-dsl-port': {
     color: dslHighlightColors.port,

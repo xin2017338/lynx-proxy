@@ -111,6 +111,7 @@ Expressions combine URL-like fragments with optional curl-style flags. Logical o
 | Form | Example | Meaning |
 |------|---------|---------|
 | Host | `example.com` | Host match (includes subdomains, e.g. `api.example.com`) |
+| Fuzzy keyword | `apple` | Bare keyword (no dot) fuzzy-matches the full URL target (`host + path + ?query`, case-insensitive) |
 | Host + port | `example.com:8080` | Host and port |
 | Path | `/api/v1` | Path prefix (`/api` also matches `/api/foo`) |
 | Glob | `/api/*/v1`, `/api/**/track` | Single-segment `*` or multi-segment `**` |
@@ -140,6 +141,7 @@ NOT */rest/* AND -X POST
 **Matching notes**
 
 - Path-only expressions do not check host; query-only expressions do not check path.
+- Bare keyword fuzzy matching checks the full URL target (`host + path + ?query`) only; it does not match method/headers.
 - Query embedded in a URL (`?a=1&b=2`) uses subset semantics; the live request may include more parameters.
 - Path matching ignores the query string when the expression has no `?…` clause.
 - For **origin-form** requests (path-only URI), host and port come from the **Host** header.

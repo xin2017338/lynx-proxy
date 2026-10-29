@@ -57,6 +57,16 @@ fn compiles_host_spaced_path_as_single_primary() {
 }
 
 #[test]
+fn compiles_bare_keyword_to_fuzzy_predicate() {
+    let program = compile_match_expr("apple").unwrap();
+    assert_eq!(program.predicates.len(), 1);
+    assert!(matches!(
+        &program.predicates[0],
+        Predicate::FuzzyContains(value) if value.as_ref() == "apple"
+    ));
+}
+
+#[test]
 fn compiles_not_or_grouping() {
     let program = compile_match_expr("NOT (example.com OR /api)").unwrap();
     assert!(matches!(program.plan, EvalPlan::Not(_)));
@@ -120,6 +130,7 @@ fn predicate_kinds(program: &MatchProgram) -> Vec<&'static str> {
         .iter()
         .map(|pred| match pred {
             Predicate::HostEq(_) => "host",
+            Predicate::FuzzyContains(_) => "fuzzy",
             Predicate::SchemeEq(_) => "scheme",
             Predicate::PortEq(_) => "port",
             Predicate::PathGlob(_) => "path",

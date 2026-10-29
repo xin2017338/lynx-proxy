@@ -21,6 +21,7 @@ pub struct MatchProgram {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Predicate {
     HostEq(Arc<str>),
+    FuzzyContains(Arc<str>),
     SchemeEq(Arc<str>),
     PortEq(u16),
     PathGlob(PathMatcher),

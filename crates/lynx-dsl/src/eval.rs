@@ -14,6 +14,7 @@ pub fn eval_program(program: &MatchProgram, facts: &RequestFacts) -> bool {
 pub fn eval_predicate(pred: &Predicate, facts: &RequestFacts) -> bool {
     match pred {
         Predicate::HostEq(expected) => host_matches(expected, &facts.host),
+        Predicate::FuzzyContains(expected) => request_contains(expected, facts),
         Predicate::SchemeEq(expected) => facts
             .scheme
             .as_deref()
@@ -60,6 +61,22 @@ fn host_matches(expected: &str, actual: &str) -> bool {
     }
 
     actual_lower.contains(&expected_lower)
+}
+
+fn request_contains(expected: &str, facts: &RequestFacts) -> bool {
+    let needle = expected.to_ascii_lowercase();
+    let mut full = String::with_capacity(
+        facts.host.len() + facts.path.len() + facts.query.as_ref().map_or(0, |q| q.len() + 1),
+    );
+    full.push_str(&facts.host);
+    full.push_str(&facts.path);
+    if let Some(query) = facts.query.as_deref()
+        && !query.is_empty()
+    {
+        full.push('?');
+        full.push_str(query);
+    }
+    full.to_ascii_lowercase().contains(&needle)
 }
 
 fn header_matches(facts: &RequestFacts, key: &str, expected: &str) -> bool {

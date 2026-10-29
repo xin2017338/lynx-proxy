@@ -241,12 +241,6 @@
                 "null"
               ]
             },
-            "modifyMethod": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "modifyStatusCode": {
               "format": "uint16",
               "minimum": 0.0,

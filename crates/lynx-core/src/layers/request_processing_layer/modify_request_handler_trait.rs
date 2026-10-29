@@ -2,7 +2,7 @@ use http::{Method, Uri};
 use http_body_util::{BodyExt, Full};
 use lynx_storage::dao::request_processing_dao::handlers::ModifyRequestConfig;
 
-use super::handler_trait::{HandleRequestType, HandlerTrait};
+use super::handler_trait::{HandleRequestType, HandlerTrait, prepare_headers_for_replaced_body};
 use crate::{common::Req, error::CoreResult};
 
 #[async_trait::async_trait]
@@ -54,12 +54,7 @@ impl HandlerTrait for ModifyRequestConfig {
         if let Some(ref new_body) = self.modify_body {
             let body_bytes = new_body.as_bytes().to_vec();
 
-            // Update content-length header
-            if let Ok(content_length) = body_bytes.len().to_string().parse() {
-                request
-                    .headers_mut()
-                    .insert("content-length", content_length);
-            }
+            prepare_headers_for_replaced_body(request.headers_mut(), body_bytes.len());
 
             // Replace the body with the new content
             let new_body = Full::new(bytes::Bytes::from(body_bytes))
@@ -159,12 +154,24 @@ mod tests {
             modify_url: None,
         };
 
-        let request = create_test_request();
+        let mut request = create_test_request();
+        request
+            .headers_mut()
+            .insert("content-encoding", "gzip".parse().unwrap());
+        request
+            .headers_mut()
+            .insert("transfer-encoding", "chunked".parse().unwrap());
+        request
+            .headers_mut()
+            .insert("digest", "sha-256=old".parse().unwrap());
         let result = config.handle_request(request).await?;
 
         if let HandleRequestType::Request(req) = result {
             let content_length = req.headers().get("content-length").unwrap();
             assert_eq!(content_length, &new_body.len().to_string());
+            assert!(req.headers().get("content-encoding").is_none());
+            assert!(req.headers().get("transfer-encoding").is_none());
+            assert!(req.headers().get("digest").is_none());
         }
         Ok(())
     }

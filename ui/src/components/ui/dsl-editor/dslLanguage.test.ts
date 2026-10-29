@@ -12,4 +12,8 @@ describe('dslHighlightColors', () => {
     expect(dslHighlightColors.host).not.toBe(dslHighlightColors.keyword)
   })
 
+  it('uses a distinct color for fuzzy keyword and host', () => {
+    expect(dslHighlightColors.fuzzyKeyword).not.toBe(dslHighlightColors.host)
+  })
+
 })

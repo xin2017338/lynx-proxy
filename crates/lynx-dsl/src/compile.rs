@@ -6,6 +6,7 @@ use thiserror::Error;
 
 use crate::ast::{AndExpr, CliArg, CliArgValue, CliArgs, NotExpr, OrExpr, Primary, Program, Url};
 use crate::error::ParseError;
+use crate::fuzzy::is_bare_fuzzy_keyword_url;
 use crate::ir::{EvalPlan, MatchProgram, PathMatcher, Predicate, SegmentPattern};
 use crate::parser::parse_program;
 use crate::query::parse_query_pairs;
@@ -110,6 +111,12 @@ impl LowerCtx {
 
     fn lower_url(&mut self, url: &Url) -> Result<EvalPlan, CompileError> {
         let mut indices = Vec::new();
+
+        if is_bare_fuzzy_keyword_url(url) {
+            let keyword = url.host.as_ref().unwrap().value.to_ascii_lowercase();
+            indices.push(self.push_predicate(Predicate::FuzzyContains(Arc::from(keyword))));
+            return Ok(plan_all_indices(indices));
+        }
 
         if let Some(scheme) = &url.scheme {
             let normalized = normalize_scheme(&scheme.value);
@@ -290,6 +297,16 @@ mod tests {
         assert!(matches!(program.predicates[0], Predicate::HostEq(_)));
         assert!(matches!(program.predicates[1], Predicate::PathGlob(_)));
         assert!(matches!(program.plan, EvalPlan::All(_)));
+    }
+
+    #[test]
+    fn compiles_bare_keyword_as_fuzzy_predicate() {
+        let program = compile_match_expr("apple").unwrap();
+        assert_eq!(program.predicates.len(), 1);
+        assert!(matches!(
+            &program.predicates[0],
+            Predicate::FuzzyContains(value) if value.as_ref() == "apple"
+        ));
     }
 
     #[test]

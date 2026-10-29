@@ -81,7 +81,6 @@ impl HandlerRule {
     pub fn modify_response_handler(
         modify_headers: Option<std::collections::HashMap<String, String>>,
         modify_body: Option<String>,
-        modify_method: Option<String>,
         modify_status_code: Option<u16>,
     ) -> Self {
         Self {
@@ -89,7 +88,6 @@ impl HandlerRule {
             handler_type: HandlerRuleType::ModifyResponse(ModifyResponseConfig {
                 modify_headers,
                 modify_body,
-                modify_method,
                 modify_status_code,
             }),
             execution_order: 80,

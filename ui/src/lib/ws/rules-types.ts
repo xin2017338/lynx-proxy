@@ -6,7 +6,7 @@ export interface CaptureRuleDto {
 export type HandlerRuleTypeDto =
   | { type: 'block'; statusCode?: number; reason?: string }
   | { type: 'modifyRequest'; modifyHeaders?: Record<string, string>; modifyBody?: string; modifyMethod?: string; modifyUrl?: string }
-  | { type: 'modifyResponse'; modifyHeaders?: Record<string, string>; modifyBody?: string; modifyMethod?: string; modifyStatusCode?: number }
+  | { type: 'modifyResponse'; modifyHeaders?: Record<string, string>; modifyBody?: string; modifyStatusCode?: number }
   | { type: 'localFile'; filePath: string; contentType?: string; statusCode?: number }
   | { type: 'proxyForward'; targetScheme?: string; targetAuthority?: string; targetPath?: string }
   | { type: 'htmlScriptInjector'; content?: string; injectionPosition?: string }

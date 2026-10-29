@@ -8,10 +8,12 @@ All notable changes to this project will be documented in this file.
 
 - *(api-studio)* Handle large and media responses with configurable body limits and improved response previews
 - *(dsl)* Support bare `http://`, `https://`, `ws://`, and `wss://` protocol matchers
+- *(dsl)* Add bare-keyword fuzzy matching on full URL target (`host + path + ?query`) with boolean composition support
 
 ### 🐛 Bug Fixes
 
 - *(capture)* Display the inner HTTP Host when it differs from the outer HTTPS CONNECT authority
+- *(ui)* Auto-rebuild DSL WASM artifacts before dev/build/test to keep frontend matching behavior in sync with Rust DSL changes
 
 ### ♻️ Refactor
 

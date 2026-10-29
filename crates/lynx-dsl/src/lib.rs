@@ -5,6 +5,7 @@ pub mod eval;
 pub mod expr_parser;
 pub mod facts;
 pub mod format;
+mod fuzzy;
 pub mod highlight;
 pub mod ir;
 pub mod parser;

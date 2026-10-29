@@ -17,6 +17,14 @@ fn parses_host_only_url() {
 }
 
 #[test]
+fn highlights_bare_keyword_as_fuzzy_keyword() {
+    let input = "apple";
+    assert!(!has_parse_errors(input));
+    assert_eq!(node_kinds(input, "FuzzyKeyword"), vec![input]);
+    assert!(node_kinds(input, "Host").is_empty());
+}
+
+#[test]
 fn parses_hyphenated_domain() {
     let input = "api.example-ex.com";
     assert!(!has_parse_errors(input));

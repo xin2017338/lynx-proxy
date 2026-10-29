@@ -1,6 +1,7 @@
 use crate::ast::{
     AndExpr, CliArg, CliArgValue, Expr, NotExpr, OrExpr, Primary, Program, Span, Url,
 };
+use crate::fuzzy::is_bare_fuzzy_keyword_url;
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct HighlightSpan {
     pub from: usize,
@@ -15,6 +16,7 @@ pub enum HighlightKind {
     NotOp,
     Scheme,
     Host,
+    FuzzyKeyword,
     Port,
     Path,
     Query,
@@ -33,6 +35,7 @@ impl HighlightKind {
             Self::NotOp => "NotOp",
             Self::Scheme => "Scheme",
             Self::Host => "Host",
+            Self::FuzzyKeyword => "FuzzyKeyword",
             Self::Port => "Port",
             Self::Path => "Path",
             Self::Query => "Query",
@@ -159,7 +162,12 @@ fn highlight_url(url: &Url, spans: &mut Vec<HighlightSpan>) {
         push_span(spans, scheme.span, HighlightKind::Scheme);
     }
     if let Some(host) = &url.host {
-        push_span(spans, host.span, HighlightKind::Host);
+        let kind = if is_bare_fuzzy_keyword_url(url) {
+            HighlightKind::FuzzyKeyword
+        } else {
+            HighlightKind::Host
+        };
+        push_span(spans, host.span, kind);
     }
     if let Some(port) = &url.port {
         push_span(spans, port.span, HighlightKind::Port);

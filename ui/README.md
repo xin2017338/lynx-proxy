@@ -119,3 +119,9 @@ Root README images are captured from this UI against a live Lynx proxy.
 Uses system **Google Chrome** by default (`channel: 'chrome'`). Override with `PLAYWRIGHT_CHANNEL` or `PLAYWRIGHT_EXECUTABLE_PATH` if needed.
 
 Demo rules live in `../scripts/fixtures/demo-rules.json`.
+
+## DSL WASM sync
+
+- UI scripts now run `npm run dsl:ensure` before `dev`, `build`, `test:unit`, and Storybook commands.
+- `dsl:ensure` checks `../crates/lynx-dsl` sources against `src/wasm/lynx-dsl/*` timestamps.
+- If Rust DSL sources are newer (or artifacts are missing), it automatically runs `npm run dsl:build`.

@@ -51,6 +51,63 @@ fn hyphenated_host_label_matches_subdomain() {
 }
 
 #[test]
+fn bare_keyword_fuzzy_matches_host_path_or_query() {
+    assert_matches(
+        "apple",
+        RequestFacts::builder().host("www.apple.com").path("/"),
+        true,
+    );
+    assert_matches(
+        "apple",
+        RequestFacts::builder().host("www.a.com").path("/apple"),
+        true,
+    );
+    assert_matches(
+        "apple",
+        RequestFacts::builder()
+            .host("www.b.com")
+            .path("/appleABC/AD"),
+        true,
+    );
+    assert_matches(
+        "apple",
+        RequestFacts::builder()
+            .host("www.c.com")
+            .path("/search")
+            .query("q=apple"),
+        true,
+    );
+    assert_matches(
+        "apple",
+        RequestFacts::builder()
+            .host("www.b.com")
+            .path("/banana")
+            .query("q=orange"),
+        false,
+    );
+}
+
+#[test]
+fn bare_keyword_can_mix_with_other_clauses() {
+    assert_matches(
+        "apple AND -X POST",
+        RequestFacts::builder()
+            .method("POST")
+            .host("www.a.com")
+            .path("/apple"),
+        true,
+    );
+    assert_matches(
+        "apple AND -X POST",
+        RequestFacts::builder()
+            .method("GET")
+            .host("www.a.com")
+            .path("/apple"),
+        false,
+    );
+}
+
+#[test]
 fn host_is_case_insensitive() {
     assert_matches(
         "Example.COM",
